@@ -1,0 +1,15 @@
+{
+  "name": "the-artists-collective-14681c",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The Artists' Collective",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "pg": "^8.13.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
