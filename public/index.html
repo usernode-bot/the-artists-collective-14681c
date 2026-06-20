@@ -743,6 +743,7 @@
 
   // ── Bridge helpers ─────────────────────────────────────────────────────────
   function bridgeGetAddress() {
+    NATIVE = !!(window.usernode && window.usernode.isNative);
     if (NATIVE) return window.usernode.getNodeAddress();
     var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
     return Promise.resolve('ut1demo' + suffix);
@@ -1111,6 +1112,13 @@
     btn.disabled = true;
     btn.textContent = 'Connecting…';
 
+    // Re-read isNative here (relay handshake has completed by now) so the
+    // mode notice reflects the actual runtime context before we connect.
+    var isLive = !!(window.usernode && window.usernode.isNative);
+    document.getElementById('mode-notice').textContent = isLive
+      ? 'Live mode — real on-chain transactions.'
+      : 'Demo mode — no real transactions.';
+
     bridgeGetAddress().then(function (addr) {
       userAddr = addr;
       document.getElementById('addr-pill').textContent = truncAddr(userAddr);
@@ -1137,10 +1145,9 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────────────────
-  NATIVE = !!(window.usernode && window.usernode.isNative);
-  document.getElementById('mode-notice').textContent = NATIVE
-    ? 'Live mode — real on-chain transactions.'
-    : 'Demo mode — no real transactions.';
+  // NATIVE is detected lazily in bridgeGetAddress() — reading isNative here
+  // would always return false because the bridge's iframe relay handshake
+  // hasn't completed yet. The mode notice is updated in the enter-btn handler.
   applyTheme();
 
 })();
