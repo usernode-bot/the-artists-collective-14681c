@@ -621,6 +621,7 @@
   <h1>Your studio, <em>on Usernode.</em></h1>
   <p class="subtitle">The community-owned art gallery. Create, sell, and govern together.</p>
   <button id="enter-btn">Enter the studio →</button>
+  <p id="enter-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:-0.25rem"></p>
   <p id="mode-notice"></p>
 </div>
 
@@ -706,6 +707,16 @@
 (function () {
   'use strict';
 
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error('timeout')); }, ms);
+      }),
+    ]);
+  }
+
   // ── State ──────────────────────────────────────────────────────────────────
   var params = new URLSearchParams(window.location.search);
   var TOKEN = params.get('token') || '';
@@ -744,14 +755,14 @@
   // ── Bridge helpers ─────────────────────────────────────────────────────────
   function bridgeGetAddress() {
     NATIVE = !!(window.usernode && window.usernode.isNative);
-    if (NATIVE) return window.usernode.getNodeAddress();
+    if (NATIVE) return withTimeout(window.getNodeAddress(), 12000);
     var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
     return Promise.resolve('ut1demo' + suffix);
   }
 
   function bridgeGetTxs() {
     if (NATIVE) {
-      return window.usernode.getTransactions({ limit: 50 }).then(function (result) {
+      return window.getTransactions({ limit: 50 }).then(function (result) {
         return Array.isArray(result) ? result : (result && result.transactions) || [];
       }).catch(function (err) {
         console.warn('getTransactions error:', err);
@@ -763,7 +774,7 @@
 
   function bridgeSend(dest, amount, memo) {
     if (NATIVE) {
-      return window.usernode.sendTransaction(dest, amount, memo).catch(function (err) {
+      return window.sendTransaction(dest, amount, memo).catch(function (err) {
         console.warn('sendTransaction error:', err);
         return null;
       });
@@ -1109,6 +1120,8 @@
   // ── Enter studio ──────────────────────────────────────────────────────────
   document.getElementById('enter-btn').addEventListener('click', function () {
     var btn = document.getElementById('enter-btn');
+    var errEl = document.getElementById('enter-error');
+    errEl.classList.add('hidden');
     btn.disabled = true;
     btn.textContent = 'Connecting…';
 
@@ -1141,6 +1154,8 @@
       console.error('Entry error:', err);
       btn.disabled = false;
       btn.textContent = 'Enter the studio →';
+      errEl.textContent = 'Could not connect to your wallet. Please try again.';
+      errEl.classList.remove('hidden');
     });
   });
 
