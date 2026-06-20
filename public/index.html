@@ -724,6 +724,7 @@
   var NATIVE = false;
   var userAddr = '';
   var cachedLedger = [];
+  var GALLERY_FEE_RATE = 0.10;
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   var themeBtn = document.getElementById('theme-toggle');
@@ -760,10 +761,29 @@
     return Promise.resolve('ut1demo' + suffix);
   }
 
+  function normalizeTx(raw) {
+    return {
+      hash:      raw.hash       || raw.id           || raw.txid         || '',
+      from:      raw.from       || raw.sender        || raw.senderAddress || '',
+      timestamp: raw.timestamp  != null ? raw.timestamp
+                 : raw.t        != null ? raw.t
+                 : raw.created_at != null ? raw.created_at
+                 : raw.time     != null ? raw.time
+                 : (Date.now() / 1000 | 0),
+      nodeCount: raw.nodeCount  != null ? raw.nodeCount
+                 : raw.n        != null ? raw.n
+                 : raw.node_count != null ? raw.node_count : 0,
+      memo:      raw.memo || raw.data || raw.note || '',
+      amount:    raw.amount != null ? raw.amount : raw.value != null ? raw.value : 0,
+    };
+  }
+
   function bridgeGetTxs() {
     if (NATIVE) {
-      return window.getTransactions({ limit: 50 }).then(function (result) {
-        return Array.isArray(result) ? result : (result && result.transactions) || [];
+      // Query without recipient filter to get all collective chain events.
+      return window.getTransactions({ limit: 100 }).then(function (result) {
+        var arr = Array.isArray(result) ? result : (result && result.transactions) || [];
+        return arr.map(normalizeTx);
       }).catch(function (err) {
         console.warn('getTransactions error:', err);
         return [];
@@ -786,13 +806,13 @@
   // ── Mock data ──────────────────────────────────────────────────────────────
   var NOW = Math.floor(Date.now() / 1000);
   var MOCK_TXS = [
-    { memo: 'sale:Staging demo — Autumn Light #1:450',  amount: 450, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Blue Resonance #7:280', amount: 280, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg1abc', amount: 0, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Quiet Tide #3:620',    amount: 620, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
-    { memo: 'artist:enrol:ut1stg2def', amount: 0, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg3ghi', amount: 0, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
-    { memo: 'artist:enrol:ut1stg4jkl', amount: 0, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
+    { memo: 'sale:Staging demo — Autumn Light #1:450:45',  amount: 1, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Blue Resonance #7:280:28', amount: 1, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg1abc', amount: 1, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Quiet Tide #3:620:62',    amount: 1, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
+    { memo: 'artist:enrol:ut1stg2def', amount: 1, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg3ghi', amount: 1, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
+    { memo: 'artist:enrol:ut1stg4jkl', amount: 1, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
   ];
 
   // ── Ledger parsing ─────────────────────────────────────────────────────────
@@ -810,9 +830,19 @@
       } else if (memo.startsWith('sale:')) {
         var parts = memo.split(':');
         if (parts.length >= 3) {
-          var rawAmt = parseFloat(parts[parts.length - 1]);
-          var title = parts.slice(1, -1).join(':');
-          acc.push({ type: 'sale', title: title, amt: isNaN(rawAmt) ? 0 : rawAmt, n: n, t: t, hash: hash, from: from });
+          var price, fee, title;
+          if (parts.length >= 4 && !isNaN(parseFloat(parts[parts.length - 2]))) {
+            // New format: sale:<title>:<price>:<fee>
+            fee   = parseFloat(parts[parts.length - 1]);
+            price = parseFloat(parts[parts.length - 2]);
+            title = parts.slice(1, -2).join(':');
+          } else {
+            // Legacy format: sale:<title>:<price>
+            price = parseFloat(parts[parts.length - 1]);
+            fee   = 0;
+            title = parts.slice(1, -1).join(':');
+          }
+          acc.push({ type: 'sale', title: title, amt: isNaN(price) ? 0 : price, fee: isNaN(fee) ? 0 : fee, n: n, t: t, hash: hash, from: from });
         }
       }
       // vote memos are silently skipped
@@ -1028,7 +1058,7 @@
       body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
     }).then(function () {
       var memo = 'vote:' + proposalId + ':' + (direction === 'for' ? 'yes' : 'no');
-      bridgeSend(userAddr, 0, memo);
+      bridgeSend(userAddr, 1, memo);
       return api('/api/proposals');
     }).then(function (data) {
       renderProposals(data.proposals);
@@ -1036,6 +1066,45 @@
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
     });
+  }
+
+  // ── Poll and refresh ───────────────────────────────────────────────────────
+  // After a tx is submitted, poll getTransactions until the hash appears
+  // (NATIVE), or inject a synthetic tx into MOCK_TXS and re-render (demo).
+  function pollAndRefresh(confirmedHash, demoTx, onComplete) {
+    function rerender(ledger) {
+      cachedLedger = ledger;
+      renderStats(computeStats(cachedLedger, userAddr));
+      renderSales(cachedLedger, userAddr);
+      renderTreasury(cachedLedger);
+      renderOwnership(cachedLedger);
+      renderLedger(cachedLedger);
+      if (onComplete) onComplete();
+    }
+
+    if (!NATIVE) {
+      if (demoTx) MOCK_TXS.unshift(demoTx);
+      rerender(parseTxs(MOCK_TXS));
+      return;
+    }
+
+    var attempts = 0;
+    var maxAttempts = 6;
+
+    function attempt() {
+      bridgeGetTxs().then(function (txs) {
+        var found = confirmedHash && txs.some(function (tx) { return tx.hash === confirmedHash; });
+        if (found || attempts >= maxAttempts) {
+          rerender(parseTxs(txs));
+        } else {
+          attempts++;
+          setTimeout(attempt, 1500);
+        }
+      }).catch(function () {
+        rerender(cachedLedger);
+      });
+    }
+    attempt();
   }
 
   // ── Sale form ──────────────────────────────────────────────────────────────
@@ -1052,20 +1121,31 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Recording…';
 
-    var memo = 'sale:' + title + ':' + amount;
-    bridgeSend(userAddr, amount, memo).then(function () {
+    var fee = Math.round(amount * GALLERY_FEE_RATE);
+    var memo = 'sale:' + title + ':' + amount + ':' + fee;
+
+    bridgeSend(userAddr, 1, memo).then(function (result) {
+      if (!result) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Record sale';
+        return;
+      }
       titleInput.value = '';
       amountInput.value = '';
-      return bridgeGetTxs();
-    }).then(function (txs) {
-      cachedLedger = parseTxs(txs);
-      renderStats(computeStats(cachedLedger, userAddr));
-      renderSales(cachedLedger, userAddr);
-      renderTreasury(cachedLedger);
-      renderOwnership(cachedLedger);
+
+      var demoTx = NATIVE ? null : {
+        memo: memo, amount: 1,
+        hash: result.hash || '',
+        timestamp: Math.floor(Date.now() / 1000),
+        nodeCount: 0, from: userAddr,
+      };
+
+      pollAndRefresh(result.hash || null, demoTx, function () {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Record sale';
+      });
     }).catch(function (err) {
       console.error('Sale error:', err);
-    }).then(function () {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Record sale';
     });
@@ -1142,7 +1222,11 @@
         bridgeGetTxs().then(function (txs) {
           var joined = parseTxs(txs).filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; });
           if (joined.indexOf(userAddr) === -1) {
-            bridgeSend(userAddr, 0, 'artist:enrol:' + userAddr);
+            bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
+              if (result) {
+                pollAndRefresh(result.hash || null, null, null);
+              }
+            }).catch(function () {});
           }
         }).catch(function () {});
       }
