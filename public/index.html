@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+
   <script>
   // usernode-dev-console@1
   (function () {
@@ -63,59 +63,1087 @@
     try { post('info', ['[dev-console ready]'], { kind: 'ready' }); } catch (_) {}
   })();
   </script>
+
+  <!-- Apply saved theme before first paint to avoid FOUC -->
+  <script>(function(){var t=localStorage.getItem('tac-theme');if(t==='light')document.documentElement.classList.add('light');})()</script>
+
   <title>The Artists' Collective</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { darkMode: 'class' }</script>
-</head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col items-center justify-center gap-8 p-4">
-  <h1 class="text-2xl font-bold">The Artists' Collective</h1>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='16' fill='%23d98c5f'/><text x='16' y='22' font-family='serif' font-size='20' font-weight='bold' text-anchor='middle' fill='%23141310'>A</text></svg>">
 
-  <button id="press-btn" class="w-32 h-32 rounded-full bg-violet-600 hover:bg-violet-500 active:scale-95 transition-all text-white text-xl font-bold shadow-lg shadow-violet-600/30">
-    Press!
-  </button>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <div id="count" class="text-lg text-zinc-400">0 total presses</div>
+  <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
 
-  <div class="w-full max-w-sm">
-    <h2 class="text-sm font-medium text-zinc-500 mb-2 text-center">Leaderboard</h2>
-    <div id="leaderboard" class="space-y-1"></div>
-  </div>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const token = params.get('token') || '';
-    const headers = token ? { 'x-usernode-token': token } : {};
-
-    async function loadLeaderboard() {
-      const res = await fetch('/api/leaderboard', { headers });
-      if (!res.ok) return;
-      const { leaderboard } = await res.json();
-      const el = document.getElementById('leaderboard');
-      if (!leaderboard.length) {
-        el.innerHTML = '<p class="text-center text-zinc-600 text-sm">No presses yet</p>';
-        return;
-      }
-      el.innerHTML = leaderboard.map((r, i) =>
-        '<div class="flex justify-between px-3 py-1 rounded ' + (i === 0 ? 'bg-violet-600/20 text-violet-300' : 'text-zinc-400') + '">' +
-        '<span>' + (i + 1) + '. ' + r.username + '</span>' +
-        '<span class="font-mono">' + r.presses + '</span></div>'
-      ).join('');
-      const total = leaderboard.reduce((s, r) => s + parseInt(r.presses), 0);
-      document.getElementById('count').textContent = total + ' total presses';
+    :root {
+      --paper: #141310;
+      --paper-2: #221f17;
+      --ink: #e8e2d5;
+      --ink-2: #9a9080;
+      --accent: #d98c5f;
+      --ok: #74c79a;
+      --line: #2e2a22;
+      --header-bg: rgba(20, 19, 16, 0.88);
+      --pill-join-bg: rgba(116, 199, 154, 0.14);
+      --pill-sale-bg: rgba(217, 140, 95, 0.14);
+      --serif: 'Cormorant Garamond', Georgia, serif;
+      --sans: 'Hanken Grotesk', system-ui, sans-serif;
     }
 
-    document.getElementById('press-btn').addEventListener('click', async () => {
-      try {
-        const res = await fetch('/api/press', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-        });
-        if (res.ok) loadLeaderboard();
-        else if (res.status === 401) document.getElementById('count').textContent = 'Sign in to press!';
-      } catch {}
-    });
+    html.light {
+      --paper: #fff;
+      --paper-2: #ece6d9;
+      --ink: #1d1b16;
+      --ink-2: #6b6355;
+      --accent: #8a3b2e;
+      --ok: #2f6b4d;
+      --line: #e4ded2;
+      --header-bg: rgba(255, 255, 255, 0.88);
+      --pill-join-bg: rgba(47, 107, 77, 0.12);
+      --pill-sale-bg: rgba(138, 59, 46, 0.12);
+    }
 
-    loadLeaderboard();
-  </script>
+    html {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 15px;
+      line-height: 1.5;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    body { min-height: 100vh; background: var(--paper); }
+
+    .hidden { display: none !important; }
+
+    @keyframes viewIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: viewIn 0.22s ease-out both; }
+
+    /* ── Header ── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      height: 3.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0 1.5rem;
+      background: var(--header-bg);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      font-weight: 400;
+      white-space: nowrap;
+      flex-shrink: 0;
+      color: var(--ink);
+    }
+    .brand em { font-style: italic; }
+
+    header nav { display: flex; gap: 0.2rem; flex: 1; }
+
+    .tab {
+      background: none;
+      border: none;
+      color: var(--ink-2);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.35rem 0.8rem;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s;
+    }
+    .tab:hover { color: var(--ink); background: var(--paper-2); }
+    .tab.active { color: var(--ink); background: var(--paper-2); }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      flex-shrink: 0;
+    }
+
+    #theme-toggle {
+      background: none;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1;
+      padding: 0.28rem 0.5rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #theme-toggle:hover { background: var(--paper-2); }
+
+    #addr-pill {
+      font-family: 'Courier New', monospace;
+      font-size: 0.73rem;
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 0.18rem 0.65rem;
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+
+    /* ── Gate ── */
+    #view-gate {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+      gap: 1.25rem;
+    }
+
+    #view-gate h1 {
+      font-family: var(--serif);
+      font-size: 2.75rem;
+      font-weight: 400;
+      line-height: 1.15;
+      max-width: 26rem;
+    }
+    #view-gate h1 em { color: var(--accent); font-style: italic; }
+
+    #view-gate .subtitle {
+      color: var(--ink-2);
+      font-size: 1rem;
+      max-width: 22rem;
+      line-height: 1.55;
+    }
+
+    #enter-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.72rem 1.8rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 0.25rem;
+    }
+    #enter-btn:hover { opacity: 0.82; }
+    #enter-btn:disabled { opacity: 0.45; cursor: default; }
+
+    #mode-notice {
+      font-size: 0.78rem;
+      color: var(--ink-2);
+      margin-top: -0.25rem;
+    }
+
+    /* ── Shared view wrapper ── */
+    .view {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 3rem;
+    }
+
+    .dash-header { margin-bottom: 1.5rem; }
+    .dash-header h1 {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 400;
+      line-height: 1.2;
+    }
+    .dash-header .subtitle {
+      color: var(--ink-2);
+      font-size: 0.88rem;
+      margin-top: 0.2rem;
+    }
+
+    /* ── Stats grid ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-card {
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1.1rem 1.25rem;
+    }
+
+    .stat-value {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 600;
+      line-height: 1.1;
+    }
+
+    .stat-label {
+      font-size: 0.73rem;
+      color: var(--ink-2);
+      margin-top: 0.2rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Two-column panels ── */
+    .panels {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 1rem;
+      align-items: start;
+    }
+
+    .panel-col { display: flex; flex-direction: column; gap: 1rem; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1.25rem;
+    }
+
+    .card h2 {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    /* ── Governance ── */
+    .proposal-title {
+      font-family: var(--serif);
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.4rem;
+    }
+
+    .proposal-desc {
+      font-size: 0.84rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+
+    .vote-bar-wrap {
+      height: 8px;
+      background: var(--line);
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+      margin-bottom: 0.45rem;
+    }
+
+    .vote-bar-for {
+      background: var(--ok);
+      height: 100%;
+      transition: width 0.35s ease;
+    }
+
+    .vote-bar-against {
+      background: var(--accent);
+      height: 100%;
+      transition: width 0.35s ease;
+    }
+
+    .vote-counts {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.77rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .vote-counts .for-count  { color: var(--ok); }
+    .vote-counts .against-count { color: var(--accent); }
+
+    .vote-buttons { display: flex; gap: 0.5rem; }
+
+    .vote-btn {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: none;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .vote-btn:hover:not(:disabled) { background: var(--paper); }
+    .vote-btn:disabled { opacity: 0.5; cursor: default; }
+
+    .vote-btn.for-btn.active {
+      background: var(--ok);
+      border-color: var(--ok);
+      color: var(--paper);
+    }
+    .vote-btn.against-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--paper);
+    }
+
+    /* ── Sales panel ── */
+    .sales-list { margin-bottom: 0; }
+
+    .sale-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 0.85rem;
+      gap: 0.5rem;
+    }
+    .sale-row:last-child { border-bottom: none; }
+
+    .sale-title {
+      font-family: var(--serif);
+      font-style: italic;
+      color: var(--ink);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .sale-amt { color: var(--ok); font-weight: 500; flex-shrink: 0; }
+
+    .sales-empty { font-size: 0.84rem; color: var(--ink-2); padding: 0.35rem 0; }
+
+    #sale-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+    }
+
+    #sale-form input {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    #sale-form input:focus { border-color: var(--accent); }
+    #sale-form input::placeholder { color: var(--ink-2); }
+
+    #sale-form button {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #sale-form button:hover:not(:disabled) { opacity: 0.82; }
+    #sale-form button:disabled { opacity: 0.45; cursor: default; }
+
+    /* ── Treasury ── */
+    .treasury-total {
+      font-family: var(--serif);
+      font-size: 2.5rem;
+      font-weight: 400;
+      line-height: 1;
+      margin-bottom: 1.25rem;
+    }
+
+    .alloc-bars { display: flex; flex-direction: column; gap: 0.8rem; }
+
+    .alloc-row { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .alloc-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.77rem;
+      color: var(--ink-2);
+    }
+
+    .alloc-pct { font-weight: 600; color: var(--ink); }
+
+    .alloc-bar-wrap {
+      height: 5px;
+      background: var(--line);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .alloc-bar-fill {
+      height: 100%;
+      background: var(--ink);
+      opacity: 0.35;
+      border-radius: 3px;
+      transition: width 0.35s ease;
+    }
+    .alloc-bar-fill.highlight { background: var(--ok); opacity: 0.75; }
+
+    /* ── Ownership ── */
+    .ownership-bars { display: flex; flex-direction: column; gap: 0.8rem; }
+
+    .own-row { display: flex; flex-direction: column; gap: 0.25rem; }
+
+    .own-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.77rem;
+      color: var(--ink-2);
+    }
+
+    .own-addr { font-family: 'Courier New', monospace; }
+    .own-pct { font-weight: 600; color: var(--ink); }
+
+    .own-bar-wrap {
+      height: 5px;
+      background: var(--line);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .own-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      opacity: 0.65;
+      border-radius: 3px;
+    }
+
+    /* ── Ledger ── */
+    .ledger-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .ledger-table th {
+      text-align: left;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-2);
+      border-bottom: 1px solid var(--line);
+      white-space: nowrap;
+    }
+
+    .ledger-table td {
+      padding: 0.65rem 0.75rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: middle;
+    }
+
+    .ledger-table tr:last-child td { border-bottom: none; }
+
+    .pill {
+      display: inline-block;
+      padding: 0.18rem 0.55rem;
+      border-radius: 20px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .pill-join { background: var(--pill-join-bg); color: var(--ok); }
+    .pill-sale { background: var(--pill-sale-bg); color: var(--accent); }
+
+    .ledger-desc em { font-family: var(--serif); font-style: italic; }
+
+    .mono {
+      font-family: 'Courier New', monospace;
+      font-size: 0.8rem;
+      color: var(--ink-2);
+    }
+
+    .ledger-empty {
+      color: var(--ink-2);
+      font-size: 0.9rem;
+      padding: 1.5rem 0.75rem;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .panels { grid-template-columns: 1fr; }
+      header { padding: 0 1rem; gap: 0.65rem; }
+      .view { padding: 1.25rem 1rem 2.5rem; }
+      #view-gate h1 { font-size: 2rem; }
+      .treasury-total { font-size: 2rem; }
+      .ledger-table th:nth-child(4),
+      .ledger-table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sticky header (hidden until studio is entered) -->
+<header id="site-header" class="hidden">
+  <span class="brand">The Artists' Collective.<em> Studio</em></span>
+  <nav>
+    <button id="tab-dash" class="tab active">Dashboard</button>
+    <button id="tab-ledger" class="tab">Ledger</button>
+  </nav>
+  <div class="header-right">
+    <button id="theme-toggle" aria-label="Toggle theme">☾</button>
+    <span id="addr-pill">—</span>
+  </div>
+</header>
+
+<!-- View: Gate -->
+<div id="view-gate">
+  <h1>Your studio, <em>on Usernode.</em></h1>
+  <p class="subtitle">The community-owned art gallery. Create, sell, and govern together.</p>
+  <button id="enter-btn">Enter the studio →</button>
+  <p id="mode-notice"></p>
+</div>
+
+<!-- View: Dashboard -->
+<div id="view-dash" class="view hidden">
+  <div class="dash-header">
+    <h1>Studio dashboard</h1>
+    <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-value" id="stat-tokens">—</div>
+      <div class="stat-label">Your tokens (TACT)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-stake">—</div>
+      <div class="stat-label">Your stake</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-sales-count">—</div>
+      <div class="stat-label">Your sales</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-value" id="stat-sales-value">—</div>
+      <div class="stat-label">Sales value</div>
+    </div>
+  </div>
+
+  <div class="panels">
+    <div class="panel-col">
+      <div class="card">
+        <h2>Governance</h2>
+        <div id="proposals-list"><p class="proposal-desc">Loading…</p></div>
+      </div>
+      <div class="card">
+        <h2>Your sales</h2>
+        <div id="sales-list"></div>
+        <form id="sale-form" autocomplete="off">
+          <input type="text" id="sale-title" placeholder="Artwork title" required maxlength="100">
+          <input type="number" id="sale-amount" placeholder="Amount" min="0.01" step="0.01" required>
+          <button type="submit">Record sale</button>
+        </form>
+      </div>
+    </div>
+    <div class="panel-col">
+      <div class="card">
+        <h2>Treasury</h2>
+        <div class="treasury-total" id="treasury-total">$—</div>
+        <div id="treasury-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Ownership</h2>
+        <div id="ownership-bars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View: Ledger -->
+<div id="view-ledger" class="view hidden">
+  <div class="dash-header">
+    <h1>On-chain ledger</h1>
+    <p class="subtitle">Gallery events recorded on the Usernode blockchain.</p>
+  </div>
+  <table class="ledger-table">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Tx hash</th>
+        <th>Nodes</th>
+        <th>Time</th>
+      </tr>
+    </thead>
+    <tbody id="ledger-body">
+      <tr><td colspan="5" class="ledger-empty">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  var params = new URLSearchParams(window.location.search);
+  var TOKEN = params.get('token') || '';
+  var HEADERS = TOKEN ? { 'x-usernode-token': TOKEN } : {};
+  var NATIVE = false;
+  var userAddr = '';
+  var cachedLedger = [];
+
+  // ── Theme ──────────────────────────────────────────────────────────────────
+  var themeBtn = document.getElementById('theme-toggle');
+
+  function applyTheme() {
+    var isLight = document.documentElement.classList.contains('light');
+    themeBtn.textContent = isLight ? '☀' : '☾';
+  }
+  applyTheme();
+
+  themeBtn.addEventListener('click', function () {
+    document.documentElement.classList.toggle('light');
+    var isLight = document.documentElement.classList.contains('light');
+    localStorage.setItem('tac-theme', isLight ? 'light' : 'dark');
+    applyTheme();
+  });
+
+  // ── API helpers ────────────────────────────────────────────────────────────
+  function api(path, opts) {
+    opts = opts || {};
+    return fetch(path, Object.assign({}, opts, {
+      headers: Object.assign({ 'Content-Type': 'application/json' }, HEADERS, opts.headers || {}),
+    })).then(function (res) {
+      if (!res.ok) throw new Error(path + ' → ' + res.status);
+      return res.json();
+    });
+  }
+
+  // ── Bridge helpers ─────────────────────────────────────────────────────────
+  function bridgeGetAddress() {
+    if (NATIVE) return window.usernode.getNodeAddress();
+    var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
+    return Promise.resolve('ut1demo' + suffix);
+  }
+
+  function bridgeGetTxs() {
+    if (NATIVE) {
+      return window.usernode.getTransactions({ limit: 50 }).then(function (result) {
+        return Array.isArray(result) ? result : (result && result.transactions) || [];
+      }).catch(function (err) {
+        console.warn('getTransactions error:', err);
+        return [];
+      });
+    }
+    return Promise.resolve(MOCK_TXS);
+  }
+
+  function bridgeSend(dest, amount, memo) {
+    if (NATIVE) {
+      return window.usernode.sendTransaction(dest, amount, memo).catch(function (err) {
+        console.warn('sendTransaction error:', err);
+        return null;
+      });
+    }
+    console.log('[demo] sendTransaction', { dest: dest, amount: amount, memo: memo });
+    return Promise.resolve({ hash: 'demo-tx-' + Math.random().toString(36).slice(2, 10) });
+  }
+
+  // ── Mock data ──────────────────────────────────────────────────────────────
+  var NOW = Math.floor(Date.now() / 1000);
+  var MOCK_TXS = [
+    { memo: 'sale:Staging demo — Autumn Light #1:450',  amount: 450, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Blue Resonance #7:280', amount: 280, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg1abc', amount: 0, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Quiet Tide #3:620',    amount: 620, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
+    { memo: 'artist:enrol:ut1stg2def', amount: 0, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg3ghi', amount: 0, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
+    { memo: 'artist:enrol:ut1stg4jkl', amount: 0, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
+  ];
+
+  // ── Ledger parsing ─────────────────────────────────────────────────────────
+  function parseTxs(txs) {
+    return txs.reduce(function (acc, tx) {
+      var memo = tx.memo || '';
+      var n = tx.nodeCount != null ? tx.nodeCount : (tx.n != null ? tx.n : 0);
+      var t = tx.timestamp != null ? tx.timestamp : (tx.t != null ? tx.t : Math.floor(Date.now() / 1000));
+      var hash = tx.hash || tx.id || '';
+      var from = tx.from || tx.sender || '';
+
+      if (memo.startsWith('artist:enrol:')) {
+        var addr = memo.slice('artist:enrol:'.length).trim();
+        acc.push({ type: 'join', who: addr, amt: null, n: n, t: t, hash: hash, from: from });
+      } else if (memo.startsWith('sale:')) {
+        var parts = memo.split(':');
+        if (parts.length >= 3) {
+          var rawAmt = parseFloat(parts[parts.length - 1]);
+          var title = parts.slice(1, -1).join(':');
+          acc.push({ type: 'sale', title: title, amt: isNaN(rawAmt) ? 0 : rawAmt, n: n, t: t, hash: hash, from: from });
+        }
+      }
+      // vote memos are silently skipped
+      return acc;
+    }, []);
+  }
+
+  function truncAddr(addr) {
+    if (!addr || addr.length <= 10) return addr || '—';
+    return addr.slice(0, 6) + '…' + addr.slice(-4);
+  }
+
+  function formatTime(t) {
+    var ms = t > 1e10 ? t : t * 1000;
+    var d = new Date(ms);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) +
+           ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  function esc(str) {
+    return String(str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  // ── Stats ──────────────────────────────────────────────────────────────────
+  function computeStats(ledger, addr) {
+    if (!NATIVE) {
+      return { tokens: 12, stakePercent: 25, salesCount: 3, salesValue: 1350 };
+    }
+    var userSales = ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; });
+    var joins = new Set(ledger.filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; }));
+    var n = Math.max(1, joins.size);
+    var salesValue = userSales.reduce(function (s, tx) { return s + tx.amt; }, 0);
+    return {
+      tokens: Math.round(salesValue * 100) / 100,
+      stakePercent: Math.round(100 / n),
+      salesCount: userSales.length,
+      salesValue: Math.round(salesValue),
+    };
+  }
+
+  // ── Render: stats ──────────────────────────────────────────────────────────
+  function renderStats(stats) {
+    document.getElementById('stat-tokens').textContent = stats.tokens;
+    document.getElementById('stat-stake').textContent = stats.stakePercent + '%';
+    document.getElementById('stat-sales-count').textContent = stats.salesCount;
+    document.getElementById('stat-sales-value').textContent = '$' + stats.salesValue.toLocaleString();
+  }
+
+  // ── Render: proposals ─────────────────────────────────────────────────────
+  function renderProposals(proposals) {
+    var el = document.getElementById('proposals-list');
+    if (!proposals.length) {
+      el.innerHTML = '<p class="proposal-desc">No proposals yet.</p>';
+      return;
+    }
+    el.innerHTML = proposals.map(function (p) {
+      var forCount = p.for_count || 0;
+      var againstCount = p.against_count || 0;
+      var total = forCount + againstCount;
+      var forPct = total > 0 ? Math.round(forCount / total * 100) : 50;
+      var againstPct = 100 - forPct;
+      return '<div class="proposal">' +
+        '<div class="proposal-title">' + esc(p.title) + '</div>' +
+        '<p class="proposal-desc">' + esc(p.description || '') + '</p>' +
+        '<div class="vote-bar-wrap">' +
+          '<div class="vote-bar-for" style="width:' + forPct + '%"></div>' +
+          '<div class="vote-bar-against" style="width:' + againstPct + '%"></div>' +
+        '</div>' +
+        '<div class="vote-counts">' +
+          '<span class="for-count">' + forCount + ' For</span>' +
+          '<span class="against-count">' + againstCount + ' Against</span>' +
+        '</div>' +
+        '<div class="vote-buttons">' +
+          '<button class="vote-btn for-btn' + (p.my_vote === 'for' ? ' active' : '') +
+            '" data-id="' + p.id + '" data-dir="for">For</button>' +
+          '<button class="vote-btn against-btn' + (p.my_vote === 'against' ? ' active' : '') +
+            '" data-id="' + p.id + '" data-dir="against">Against</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    el.querySelectorAll('.vote-btn').forEach(function (btn) {
+      btn.addEventListener('click', handleVote);
+    });
+  }
+
+  // ── Render: sales panel ───────────────────────────────────────────────────
+  function renderSales(ledger, addr) {
+    var el = document.getElementById('sales-list');
+    var sales = NATIVE
+      ? ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; })
+      : ledger.filter(function (tx) { return tx.type === 'sale'; });
+
+    if (!sales.length) {
+      el.innerHTML = '<p class="sales-empty">No sales recorded yet.</p>';
+      return;
+    }
+    el.innerHTML = '<div class="sales-list">' +
+      sales.slice(0, 10).map(function (tx) {
+        return '<div class="sale-row">' +
+          '<span class="sale-title">' + esc(tx.title) + '</span>' +
+          '<span class="sale-amt">$' + tx.amt.toLocaleString() + '</span>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  // ── Render: treasury ──────────────────────────────────────────────────────
+  var ALLOCATIONS = [
+    { label: 'Artist dividends', pct: 55, highlight: true },
+    { label: 'Marketing',        pct: 20 },
+    { label: 'Infrastructure',   pct: 15 },
+    { label: 'Reserve',          pct: 10 },
+  ];
+
+  function renderTreasury(ledger) {
+    var total = ledger.filter(function (tx) { return tx.type === 'sale'; })
+                      .reduce(function (s, tx) { return s + tx.amt; }, 0);
+    var display = NATIVE ? '$' + Math.round(total).toLocaleString() : '$12,480';
+    document.getElementById('treasury-total').textContent = display;
+
+    document.getElementById('treasury-bars').innerHTML =
+      '<div class="alloc-bars">' +
+      ALLOCATIONS.map(function (a) {
+        return '<div class="alloc-row">' +
+          '<div class="alloc-label-row"><span>' + a.label + '</span><span class="alloc-pct">' + a.pct + '%</span></div>' +
+          '<div class="alloc-bar-wrap"><div class="alloc-bar-fill' + (a.highlight ? ' highlight' : '') +
+            '" style="width:' + a.pct + '%"></div></div>' +
+        '</div>';
+      }).join('') +
+      '</div>';
+  }
+
+  // ── Render: ownership ─────────────────────────────────────────────────────
+  var MOCK_ARTISTS = [
+    { addr: 'ut1stg1abc', pct: 25 },
+    { addr: 'ut1stg2def', pct: 25 },
+    { addr: 'ut1stg3ghi', pct: 25 },
+    { addr: 'ut1stg4jkl', pct: 25 },
+  ];
+
+  function renderOwnership(ledger) {
+    var el = document.getElementById('ownership-bars');
+    var artists;
+
+    if (!NATIVE) {
+      artists = MOCK_ARTISTS;
+    } else {
+      var seen = new Map();
+      ledger.filter(function (tx) { return tx.type === 'join'; }).forEach(function (tx) {
+        if (!seen.has(tx.who)) seen.set(tx.who, true);
+      });
+      var n = Math.max(1, seen.size);
+      var pct = Math.round(100 / n);
+      artists = Array.from(seen.keys()).map(function (addr) { return { addr: addr, pct: pct }; });
+    }
+
+    if (!artists.length) {
+      el.innerHTML = '<p class="sales-empty">No artists enrolled yet.</p>';
+      return;
+    }
+
+    el.innerHTML = '<div class="ownership-bars">' +
+      artists.map(function (a) {
+        return '<div class="own-row">' +
+          '<div class="own-label-row">' +
+            '<span class="own-addr">' + truncAddr(a.addr) + '</span>' +
+            '<span class="own-pct">' + a.pct + '%</span>' +
+          '</div>' +
+          '<div class="own-bar-wrap"><div class="own-bar-fill" style="width:' + a.pct + '%"></div></div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  // ── Render: ledger ────────────────────────────────────────────────────────
+  function renderLedger(ledger) {
+    var tbody = document.getElementById('ledger-body');
+    if (!ledger.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="ledger-empty">No on-chain events yet.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = ledger.map(function (tx) {
+      var pill = tx.type === 'join'
+        ? '<span class="pill pill-join">Artist joined</span>'
+        : '<span class="pill pill-sale">Sale</span>';
+      var desc = tx.type === 'join'
+        ? '<span class="mono">' + esc(truncAddr(tx.who)) + '</span>'
+        : '<em>' + esc(tx.title) + '</em> — $' + tx.amt.toLocaleString();
+      var hashDisplay = tx.hash ? tx.hash.slice(0, 8) + '…' : '—';
+      return '<tr>' +
+        '<td>' + pill + '</td>' +
+        '<td class="ledger-desc">' + desc + '</td>' +
+        '<td class="mono">' + esc(hashDisplay) + '</td>' +
+        '<td>' + tx.n + '</td>' +
+        '<td class="mono">' + formatTime(tx.t) + '</td>' +
+      '</tr>';
+    }).join('');
+  }
+
+  // ── Vote handler ───────────────────────────────────────────────────────────
+  function handleVote(e) {
+    var btn = e.currentTarget;
+    var proposalId = parseInt(btn.dataset.id, 10);
+    var direction = btn.dataset.dir;
+    var allBtns = btn.closest('.proposal').querySelectorAll('.vote-btn');
+
+    allBtns.forEach(function (b) { b.disabled = true; });
+
+    api('/api/votes', {
+      method: 'POST',
+      body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
+    }).then(function () {
+      var memo = 'vote:' + proposalId + ':' + (direction === 'for' ? 'yes' : 'no');
+      bridgeSend(userAddr, 0, memo);
+      return api('/api/proposals');
+    }).then(function (data) {
+      renderProposals(data.proposals);
+    }).catch(function (err) {
+      console.error('Vote error:', err);
+      allBtns.forEach(function (b) { b.disabled = false; });
+    });
+  }
+
+  // ── Sale form ──────────────────────────────────────────────────────────────
+  document.getElementById('sale-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var titleInput = document.getElementById('sale-title');
+    var amountInput = document.getElementById('sale-amount');
+    var submitBtn = e.target.querySelector('button[type="submit"]');
+
+    var title = titleInput.value.replace(/:/g, '-').trim();
+    var amount = parseFloat(amountInput.value);
+    if (!title || isNaN(amount) || amount <= 0) return;
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Recording…';
+
+    var memo = 'sale:' + title + ':' + amount;
+    bridgeSend(userAddr, amount, memo).then(function () {
+      titleInput.value = '';
+      amountInput.value = '';
+      return bridgeGetTxs();
+    }).then(function (txs) {
+      cachedLedger = parseTxs(txs);
+      renderStats(computeStats(cachedLedger, userAddr));
+      renderSales(cachedLedger, userAddr);
+      renderTreasury(cachedLedger);
+      renderOwnership(cachedLedger);
+    }).catch(function (err) {
+      console.error('Sale error:', err);
+    }).then(function () {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Record sale';
+    });
+  });
+
+  // ── View switching ─────────────────────────────────────────────────────────
+  function showView(viewId) {
+    ['view-gate', 'view-dash', 'view-ledger'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (id === viewId) {
+        el.classList.remove('hidden');
+        el.classList.add('fade-in');
+        setTimeout(function () { el.classList.remove('fade-in'); }, 300);
+      } else {
+        el.classList.add('hidden');
+      }
+    });
+    document.getElementById('tab-dash').classList.toggle('active', viewId === 'view-dash');
+    document.getElementById('tab-ledger').classList.toggle('active', viewId === 'view-ledger');
+  }
+
+  // ── Tab listeners ──────────────────────────────────────────────────────────
+  document.getElementById('tab-dash').addEventListener('click', function () {
+    showView('view-dash');
+  });
+
+  document.getElementById('tab-ledger').addEventListener('click', function () {
+    showView('view-ledger');
+    renderLedger(cachedLedger);
+  });
+
+  // ── Dashboard load ─────────────────────────────────────────────────────────
+  function loadDashboard() {
+    return Promise.all([
+      api('/api/proposals'),
+      bridgeGetTxs(),
+    ]).then(function (results) {
+      var proposals = results[0].proposals;
+      var txs = results[1];
+      cachedLedger = parseTxs(txs);
+
+      renderProposals(proposals);
+      renderStats(computeStats(cachedLedger, userAddr));
+      renderSales(cachedLedger, userAddr);
+      renderTreasury(cachedLedger);
+      renderOwnership(cachedLedger);
+    }).catch(function (err) {
+      console.error('Dashboard load error:', err);
+    });
+  }
+
+  // ── Enter studio ──────────────────────────────────────────────────────────
+  document.getElementById('enter-btn').addEventListener('click', function () {
+    var btn = document.getElementById('enter-btn');
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+
+    bridgeGetAddress().then(function (addr) {
+      userAddr = addr;
+      document.getElementById('addr-pill').textContent = truncAddr(userAddr);
+      document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
+
+      // Enrol on-chain if NATIVE and not yet enrolled
+      if (NATIVE) {
+        bridgeGetTxs().then(function (txs) {
+          var joined = parseTxs(txs).filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; });
+          if (joined.indexOf(userAddr) === -1) {
+            bridgeSend(userAddr, 0, 'artist:enrol:' + userAddr);
+          }
+        }).catch(function () {});
+      }
+
+      document.getElementById('site-header').classList.remove('hidden');
+      showView('view-dash');
+      return loadDashboard();
+    }).catch(function (err) {
+      console.error('Entry error:', err);
+      btn.disabled = false;
+      btn.textContent = 'Enter the studio →';
+    });
+  });
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  NATIVE = !!(window.usernode && window.usernode.isNative);
+  document.getElementById('mode-notice').textContent = NATIVE
+    ? 'Live mode — real on-chain transactions.'
+    : 'Demo mode — no real transactions.';
+  applyTheme();
+
+})();
+</script>
 </body>
 </html>

@@ -1,3 +1,8 @@
 {
-  "secrets": []
+  "name": "The Artists' Collective",
+  "secrets": [],
+  "visibility": { "build": "public", "view": "public" },
+  "tests": [
+    { "name": "Studio gate renders", "path": "/?demo=1", "expectSelector": "#view-gate" }
+  ]
 }
