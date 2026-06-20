@@ -257,6 +257,17 @@
       padding: 2rem 1.5rem 3rem;
     }
 
+    #chain-notice {
+      background: var(--pill-sale-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      margin-bottom: 1.25rem;
+    }
+
     .dash-header { margin-bottom: 1.5rem; }
     .dash-header h1 {
       font-family: var(--serif);
@@ -621,6 +632,7 @@
   <h1>Your studio, <em>on Usernode.</em></h1>
   <p class="subtitle">The community-owned art gallery. Create, sell, and govern together.</p>
   <button id="enter-btn">Enter the studio →</button>
+  <p id="enter-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:-0.25rem"></p>
   <p id="mode-notice"></p>
 </div>
 
@@ -630,6 +642,8 @@
     <h1>Studio dashboard</h1>
     <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
   </div>
+
+  <p id="chain-notice" class="hidden" role="status"></p>
 
   <div class="stats-grid">
     <div class="stat-card">
@@ -706,6 +720,19 @@
 (function () {
   'use strict';
 
+  window.usernode = window.usernode || {};
+  window.usernode.transactionsBaseUrl = '/explorer-api';
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      promise,
+      new Promise(function (_, reject) {
+        setTimeout(function () { reject(new Error('timeout')); }, ms);
+      }),
+    ]);
+  }
+
   // ── State ──────────────────────────────────────────────────────────────────
   var params = new URLSearchParams(window.location.search);
   var TOKEN = params.get('token') || '';
@@ -713,6 +740,27 @@
   var NATIVE = false;
   var userAddr = '';
   var cachedLedger = [];
+  var dbSales = [];
+  var dbEnrolments = [];
+  var GALLERY_FEE_RATE = 0.10;
+  var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
+
+  // ── Chain-write notice ───────────────────────────────────────────────────────
+  // Shown when a DB write succeeded but the best-effort on-chain receipt could
+  // not be posted (e.g. the wallet holds no spendable base-currency balance).
+  var _noticeTimer = null;
+  function showChainNotice(msg) {
+    var el = document.getElementById('chain-notice');
+    if (!el) return;
+    if (_noticeTimer) { clearTimeout(_noticeTimer); _noticeTimer = null; }
+    if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    _noticeTimer = setTimeout(function () {
+      el.classList.add('hidden');
+      el.textContent = '';
+    }, 9000);
+  }
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   var themeBtn = document.getElementById('theme-toggle');
@@ -744,15 +792,34 @@
   // ── Bridge helpers ─────────────────────────────────────────────────────────
   function bridgeGetAddress() {
     NATIVE = !!(window.usernode && window.usernode.isNative);
-    if (NATIVE) return window.usernode.getNodeAddress();
+    if (NATIVE) return withTimeout(window.getNodeAddress(), 12000);
     var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
     return Promise.resolve('ut1demo' + suffix);
   }
 
+  function normalizeTx(raw) {
+    return {
+      hash:      raw.hash       || raw.id           || raw.txid         || '',
+      from:      raw.from       || raw.sender        || raw.senderAddress || '',
+      timestamp: raw.timestamp  != null ? raw.timestamp
+                 : raw.t        != null ? raw.t
+                 : raw.created_at != null ? raw.created_at
+                 : raw.time     != null ? raw.time
+                 : (Date.now() / 1000 | 0),
+      nodeCount: raw.nodeCount  != null ? raw.nodeCount
+                 : raw.n        != null ? raw.n
+                 : raw.node_count != null ? raw.node_count : 0,
+      memo:      raw.memo || raw.data || raw.note || '',
+      amount:    raw.amount != null ? raw.amount : raw.value != null ? raw.value : 0,
+    };
+  }
+
   function bridgeGetTxs() {
     if (NATIVE) {
-      return window.usernode.getTransactions({ limit: 50 }).then(function (result) {
-        return Array.isArray(result) ? result : (result && result.transactions) || [];
+      // Query without recipient filter to get all collective chain events.
+      return window.getTransactions({ limit: 100 }).then(function (result) {
+        var arr = Array.isArray(result) ? result : (result && result.transactions) || [];
+        return arr.map(normalizeTx);
       }).catch(function (err) {
         console.warn('getTransactions error:', err);
         return [];
@@ -763,7 +830,7 @@
 
   function bridgeSend(dest, amount, memo) {
     if (NATIVE) {
-      return window.usernode.sendTransaction(dest, amount, memo).catch(function (err) {
+      return window.sendTransaction(dest, amount, memo).catch(function (err) {
         console.warn('sendTransaction error:', err);
         return null;
       });
@@ -775,13 +842,13 @@
   // ── Mock data ──────────────────────────────────────────────────────────────
   var NOW = Math.floor(Date.now() / 1000);
   var MOCK_TXS = [
-    { memo: 'sale:Staging demo — Autumn Light #1:450',  amount: 450, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Blue Resonance #7:280', amount: 280, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg1abc', amount: 0, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Quiet Tide #3:620',    amount: 620, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
-    { memo: 'artist:enrol:ut1stg2def', amount: 0, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg3ghi', amount: 0, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
-    { memo: 'artist:enrol:ut1stg4jkl', amount: 0, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
+    { memo: 'sale:Staging demo — Autumn Light #1:450:45',  amount: 1, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Blue Resonance #7:280:28', amount: 1, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg1abc', amount: 1, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
+    { memo: 'sale:Staging demo — Quiet Tide #3:620:62',    amount: 1, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
+    { memo: 'artist:enrol:ut1stg2def', amount: 1, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
+    { memo: 'artist:enrol:ut1stg3ghi', amount: 1, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
+    { memo: 'artist:enrol:ut1stg4jkl', amount: 1, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
   ];
 
   // ── Ledger parsing ─────────────────────────────────────────────────────────
@@ -799,9 +866,19 @@
       } else if (memo.startsWith('sale:')) {
         var parts = memo.split(':');
         if (parts.length >= 3) {
-          var rawAmt = parseFloat(parts[parts.length - 1]);
-          var title = parts.slice(1, -1).join(':');
-          acc.push({ type: 'sale', title: title, amt: isNaN(rawAmt) ? 0 : rawAmt, n: n, t: t, hash: hash, from: from });
+          var price, fee, title;
+          if (parts.length >= 4 && !isNaN(parseFloat(parts[parts.length - 2]))) {
+            // New format: sale:<title>:<price>:<fee>
+            fee   = parseFloat(parts[parts.length - 1]);
+            price = parseFloat(parts[parts.length - 2]);
+            title = parts.slice(1, -2).join(':');
+          } else {
+            // Legacy format: sale:<title>:<price>
+            price = parseFloat(parts[parts.length - 1]);
+            fee   = 0;
+            title = parts.slice(1, -1).join(':');
+          }
+          acc.push({ type: 'sale', title: title, amt: isNaN(price) ? 0 : price, fee: isNaN(fee) ? 0 : fee, n: n, t: t, hash: hash, from: from });
         }
       }
       // vote memos are silently skipped
@@ -827,14 +904,18 @@
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  function computeStats(ledger, addr) {
-    if (!NATIVE) {
-      return { tokens: 12, stakePercent: 25, salesCount: 3, salesValue: 1350 };
-    }
-    var userSales = ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; });
-    var joins = new Set(ledger.filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; }));
-    var n = Math.max(1, joins.size);
-    var salesValue = userSales.reduce(function (s, tx) { return s + tx.amt; }, 0);
+  // Derived from the DB source of truth: sales (/api/sales) and enrolments
+  // (/api/enrolments). In NATIVE mode "Your sales" is filtered to the connected
+  // wallet; in demo mode (no real wallet) we show all sales so the dashboard
+  // isn't blank.
+  function mySales(sales, addr) {
+    return NATIVE ? sales.filter(function (s) { return s.seller_addr === addr; }) : sales;
+  }
+
+  function computeStats(sales, enrolments, addr) {
+    var userSales = mySales(sales, addr);
+    var n = Math.max(1, enrolments.length);
+    var salesValue = userSales.reduce(function (s, row) { return s + Number(row.amount || 0); }, 0);
     return {
       tokens: Math.round(salesValue * 100) / 100,
       stakePercent: Math.round(100 / n),
@@ -890,21 +971,20 @@
   }
 
   // ── Render: sales panel ───────────────────────────────────────────────────
-  function renderSales(ledger, addr) {
+  // Renders from the DB sales list (source of truth), not the chain ledger.
+  function renderSales(sales, addr) {
     var el = document.getElementById('sales-list');
-    var sales = NATIVE
-      ? ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; })
-      : ledger.filter(function (tx) { return tx.type === 'sale'; });
+    var rows = mySales(sales, addr);
 
-    if (!sales.length) {
+    if (!rows.length) {
       el.innerHTML = '<p class="sales-empty">No sales recorded yet.</p>';
       return;
     }
     el.innerHTML = '<div class="sales-list">' +
-      sales.slice(0, 10).map(function (tx) {
+      rows.slice(0, 10).map(function (row) {
         return '<div class="sale-row">' +
-          '<span class="sale-title">' + esc(tx.title) + '</span>' +
-          '<span class="sale-amt">$' + tx.amt.toLocaleString() + '</span>' +
+          '<span class="sale-title">' + esc(row.title) + '</span>' +
+          '<span class="sale-amt">$' + Number(row.amount || 0).toLocaleString() + '</span>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -918,11 +998,9 @@
     { label: 'Reserve',          pct: 10 },
   ];
 
-  function renderTreasury(ledger) {
-    var total = ledger.filter(function (tx) { return tx.type === 'sale'; })
-                      .reduce(function (s, tx) { return s + tx.amt; }, 0);
-    var display = NATIVE ? '$' + Math.round(total).toLocaleString() : '$12,480';
-    document.getElementById('treasury-total').textContent = display;
+  function renderTreasury(sales) {
+    var total = sales.reduce(function (s, row) { return s + Number(row.amount || 0); }, 0);
+    document.getElementById('treasury-total').textContent = '$' + Math.round(total).toLocaleString();
 
     document.getElementById('treasury-bars').innerHTML =
       '<div class="alloc-bars">' +
@@ -937,28 +1015,17 @@
   }
 
   // ── Render: ownership ─────────────────────────────────────────────────────
-  var MOCK_ARTISTS = [
-    { addr: 'ut1stg1abc', pct: 25 },
-    { addr: 'ut1stg2def', pct: 25 },
-    { addr: 'ut1stg3ghi', pct: 25 },
-    { addr: 'ut1stg4jkl', pct: 25 },
-  ];
-
-  function renderOwnership(ledger) {
+  // Renders from the DB enrolments list (source of truth) — each enrolled
+  // artist holds an equal share.
+  function renderOwnership(enrolments) {
     var el = document.getElementById('ownership-bars');
-    var artists;
-
-    if (!NATIVE) {
-      artists = MOCK_ARTISTS;
-    } else {
-      var seen = new Map();
-      ledger.filter(function (tx) { return tx.type === 'join'; }).forEach(function (tx) {
-        if (!seen.has(tx.who)) seen.set(tx.who, true);
-      });
-      var n = Math.max(1, seen.size);
-      var pct = Math.round(100 / n);
-      artists = Array.from(seen.keys()).map(function (addr) { return { addr: addr, pct: pct }; });
-    }
+    var seen = [];
+    enrolments.forEach(function (row) {
+      if (row.addr && seen.indexOf(row.addr) === -1) seen.push(row.addr);
+    });
+    var n = Math.max(1, seen.length);
+    var pct = Math.round(100 / n);
+    var artists = seen.map(function (addr) { return { addr: addr, pct: pct }; });
 
     if (!artists.length) {
       el.innerHTML = '<p class="sales-empty">No artists enrolled yet.</p>';
@@ -1012,18 +1079,45 @@
 
     allBtns.forEach(function (b) { b.disabled = true; });
 
+    // DB write first (source of truth), then a best-effort on-chain receipt.
     api('/api/votes', {
       method: 'POST',
       body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
     }).then(function () {
       var memo = 'vote:' + proposalId + ':' + (direction === 'for' ? 'yes' : 'no');
-      bridgeSend(userAddr, 0, memo);
+      return bridgeSend(userAddr, 1, memo);
+    }).then(function (result) {
+      if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
       return api('/api/proposals');
     }).then(function (data) {
       renderProposals(data.proposals);
     }).catch(function (err) {
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
+    });
+  }
+
+  // ── Refresh dashboard panels from the DB source of truth ─────────────────────
+  // Sales / treasury / ownership / stats come from the DB; the Ledger tab is
+  // refreshed from the chain via getTransactions (which may be empty if the
+  // explorer read-back is unavailable — that's non-fatal).
+  function refreshDashboard() {
+    return Promise.all([
+      api('/api/sales'),
+      api('/api/enrolments'),
+      bridgeGetTxs(),
+    ]).then(function (results) {
+      dbSales = (results[0] && results[0].sales) || [];
+      dbEnrolments = (results[1] && results[1].enrolments) || [];
+      cachedLedger = parseTxs(results[2] || []);
+
+      renderStats(computeStats(dbSales, dbEnrolments, userAddr));
+      renderSales(dbSales, userAddr);
+      renderTreasury(dbSales);
+      renderOwnership(dbEnrolments);
+      renderLedger(cachedLedger);
+    }).catch(function (err) {
+      console.warn('refreshDashboard error:', err);
     });
   }
 
@@ -1041,20 +1135,37 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Recording…';
 
-    var memo = 'sale:' + title + ':' + amount;
-    bridgeSend(userAddr, amount, memo).then(function () {
+    var fee = Math.round(amount * GALLERY_FEE_RATE);
+    var memo = 'sale:' + title + ':' + amount + ':' + fee;
+
+    // 1) Persist the sale in the DB (source of truth) — this always "sticks".
+    api('/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({ title: title, amount: amount, fee: fee, seller_addr: userAddr }),
+    }).then(function (resp) {
+      var sale = resp.sale;
       titleInput.value = '';
       amountInput.value = '';
-      return bridgeGetTxs();
-    }).then(function (txs) {
-      cachedLedger = parseTxs(txs);
-      renderStats(computeStats(cachedLedger, userAddr));
-      renderSales(cachedLedger, userAddr);
-      renderTreasury(cachedLedger);
-      renderOwnership(cachedLedger);
+
+      // 2) Best-effort on-chain receipt. A null result means the node rejected
+      //    the send (e.g. no spendable balance) — the sale is still saved.
+      return bridgeSend(userAddr, 1, memo).then(function (result) {
+        if (result && result.hash && sale && sale.id != null) {
+          api('/api/sales/' + sale.id + '/tx', {
+            method: 'POST',
+            body: JSON.stringify({ tx_hash: result.hash }),
+          }).catch(function () {});
+          showChainNotice('');
+        } else if (!result) {
+          showChainNotice(NO_BALANCE_MSG);
+        }
+        return refreshDashboard();
+      });
+    }).then(function () {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Record sale';
     }).catch(function (err) {
       console.error('Sale error:', err);
-    }).then(function () {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Record sale';
     });
@@ -1090,17 +1201,20 @@
   function loadDashboard() {
     return Promise.all([
       api('/api/proposals'),
+      api('/api/sales'),
+      api('/api/enrolments'),
       bridgeGetTxs(),
     ]).then(function (results) {
       var proposals = results[0].proposals;
-      var txs = results[1];
-      cachedLedger = parseTxs(txs);
+      dbSales = (results[1] && results[1].sales) || [];
+      dbEnrolments = (results[2] && results[2].enrolments) || [];
+      cachedLedger = parseTxs(results[3] || []);
 
       renderProposals(proposals);
-      renderStats(computeStats(cachedLedger, userAddr));
-      renderSales(cachedLedger, userAddr);
-      renderTreasury(cachedLedger);
-      renderOwnership(cachedLedger);
+      renderStats(computeStats(dbSales, dbEnrolments, userAddr));
+      renderSales(dbSales, userAddr);
+      renderTreasury(dbSales);
+      renderOwnership(dbEnrolments);
     }).catch(function (err) {
       console.error('Dashboard load error:', err);
     });
@@ -1109,6 +1223,8 @@
   // ── Enter studio ──────────────────────────────────────────────────────────
   document.getElementById('enter-btn').addEventListener('click', function () {
     var btn = document.getElementById('enter-btn');
+    var errEl = document.getElementById('enter-error');
+    errEl.classList.add('hidden');
     btn.disabled = true;
     btn.textContent = 'Connecting…';
 
@@ -1124,12 +1240,26 @@
       document.getElementById('addr-pill').textContent = truncAddr(userAddr);
       document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
 
-      // Enrol on-chain if NATIVE and not yet enrolled
+      // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
+      // just POST and let the DB decide if it's a new enrolment. A new enrolment
+      // gets a best-effort on-chain receipt.
       if (NATIVE) {
-        bridgeGetTxs().then(function (txs) {
-          var joined = parseTxs(txs).filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; });
-          if (joined.indexOf(userAddr) === -1) {
-            bridgeSend(userAddr, 0, 'artist:enrol:' + userAddr);
+        api('/api/enrolments', {
+          method: 'POST',
+          body: JSON.stringify({ addr: userAddr }),
+        }).then(function (resp) {
+          if (resp && resp.enrolled && resp.enrolment) {
+            bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
+              if (result && result.hash) {
+                api('/api/enrolments/' + resp.enrolment.id + '/tx', {
+                  method: 'POST',
+                  body: JSON.stringify({ tx_hash: result.hash }),
+                }).catch(function () {});
+              } else if (!result) {
+                showChainNotice(NO_BALANCE_MSG);
+              }
+              return refreshDashboard();
+            }).catch(function () {});
           }
         }).catch(function () {});
       }
@@ -1141,6 +1271,8 @@
       console.error('Entry error:', err);
       btn.disabled = false;
       btn.textContent = 'Enter the studio →';
+      errEl.textContent = 'Could not connect to your wallet. Please try again.';
+      errEl.classList.remove('hidden');
     });
   });
 
@@ -1149,6 +1281,16 @@
   // would always return false because the bridge's iframe relay handshake
   // hasn't completed yet. The mode notice is updated in the enter-btn handler.
   applyTheme();
+
+  // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
+  // screenshots and proposal checks land on a populated dashboard (which
+  // renders from the seeded DB) instead of the gate. No-op without the flag.
+  if (params.get('demo') === '1') {
+    setTimeout(function () {
+      var enterBtn = document.getElementById('enter-btn');
+      if (enterBtn) enterBtn.click();
+    }, 0);
+  }
 
 })();
 </script>

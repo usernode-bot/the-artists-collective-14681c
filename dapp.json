@@ -1,11 +1,26 @@
 {
   "name": "The Artists' Collective",
-  "secrets": [],
+  "secrets": [
+    {
+      "key": "NODE_RPC_URL",
+      "description": "Base URL of the Usernode block-explorer / node RPC. The /explorer-api proxy forwards getTransactions read-back here. Platform-managed in-network; this default is only used for standalone deploys.",
+      "required": false,
+      "private": false,
+      "default": "http://host.docker.internal:3001"
+    },
+    {
+      "key": "CHAIN_ID",
+      "description": "Chain id segment the explorer expects in its transactions path (POST /<chain_id>/transactions). The /explorer-api proxy inserts it between NODE_RPC_URL and the sub-path. Leave unset to forward without a chain segment.",
+      "required": false,
+      "private": false
+    }
+  ],
   "visibility": {
     "build": "private",
     "view": "private"
   },
   "tests": [
-    { "name": "Studio gate renders", "path": "/?demo=1", "expectSelector": "#view-gate" }
+    { "name": "Studio gate renders", "path": "/", "expectSelector": "#view-gate" },
+    { "name": "Studio dashboard renders", "path": "/?demo=1", "expectSelector": "#view-dash" }
   ]
 }
