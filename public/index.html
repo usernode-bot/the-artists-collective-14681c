@@ -707,6 +707,9 @@
 (function () {
   'use strict';
 
+  window.usernode = window.usernode || {};
+  window.usernode.transactionsBaseUrl = '/explorer-api';
+
   // ── Utilities ─────────────────────────────────────────────────────────────
   function withTimeout(promise, ms) {
     return Promise.race([
