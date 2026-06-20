@@ -755,14 +755,14 @@
   // ── Bridge helpers ─────────────────────────────────────────────────────────
   function bridgeGetAddress() {
     NATIVE = !!(window.usernode && window.usernode.isNative);
-    if (NATIVE) return withTimeout(window.usernode.getNodeAddress(), 12000);
+    if (NATIVE) return withTimeout(window.getNodeAddress(), 12000);
     var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
     return Promise.resolve('ut1demo' + suffix);
   }
 
   function bridgeGetTxs() {
     if (NATIVE) {
-      return window.usernode.getTransactions({ limit: 50 }).then(function (result) {
+      return window.getTransactions({ limit: 50 }).then(function (result) {
         return Array.isArray(result) ? result : (result && result.transactions) || [];
       }).catch(function (err) {
         console.warn('getTransactions error:', err);
@@ -774,7 +774,7 @@
 
   function bridgeSend(dest, amount, memo) {
     if (NATIVE) {
-      return window.usernode.sendTransaction(dest, amount, memo).catch(function (err) {
+      return window.sendTransaction(dest, amount, memo).catch(function (err) {
         console.warn('sendTransaction error:', err);
         return null;
       });
