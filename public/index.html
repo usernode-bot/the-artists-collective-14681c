@@ -257,6 +257,17 @@
       padding: 2rem 1.5rem 3rem;
     }
 
+    #chain-notice {
+      background: var(--pill-sale-bg);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 4px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      margin-bottom: 1.25rem;
+    }
+
     .dash-header { margin-bottom: 1.5rem; }
     .dash-header h1 {
       font-family: var(--serif);
@@ -632,6 +643,8 @@
     <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
   </div>
 
+  <p id="chain-notice" class="hidden" role="status"></p>
+
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-value" id="stat-tokens">—</div>
@@ -727,7 +740,27 @@
   var NATIVE = false;
   var userAddr = '';
   var cachedLedger = [];
+  var dbSales = [];
+  var dbEnrolments = [];
   var GALLERY_FEE_RATE = 0.10;
+  var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
+
+  // ── Chain-write notice ───────────────────────────────────────────────────────
+  // Shown when a DB write succeeded but the best-effort on-chain receipt could
+  // not be posted (e.g. the wallet holds no spendable base-currency balance).
+  var _noticeTimer = null;
+  function showChainNotice(msg) {
+    var el = document.getElementById('chain-notice');
+    if (!el) return;
+    if (_noticeTimer) { clearTimeout(_noticeTimer); _noticeTimer = null; }
+    if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    _noticeTimer = setTimeout(function () {
+      el.classList.add('hidden');
+      el.textContent = '';
+    }, 9000);
+  }
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   var themeBtn = document.getElementById('theme-toggle');
@@ -871,14 +904,18 @@
   }
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  function computeStats(ledger, addr) {
-    if (!NATIVE) {
-      return { tokens: 12, stakePercent: 25, salesCount: 3, salesValue: 1350 };
-    }
-    var userSales = ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; });
-    var joins = new Set(ledger.filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; }));
-    var n = Math.max(1, joins.size);
-    var salesValue = userSales.reduce(function (s, tx) { return s + tx.amt; }, 0);
+  // Derived from the DB source of truth: sales (/api/sales) and enrolments
+  // (/api/enrolments). In NATIVE mode "Your sales" is filtered to the connected
+  // wallet; in demo mode (no real wallet) we show all sales so the dashboard
+  // isn't blank.
+  function mySales(sales, addr) {
+    return NATIVE ? sales.filter(function (s) { return s.seller_addr === addr; }) : sales;
+  }
+
+  function computeStats(sales, enrolments, addr) {
+    var userSales = mySales(sales, addr);
+    var n = Math.max(1, enrolments.length);
+    var salesValue = userSales.reduce(function (s, row) { return s + Number(row.amount || 0); }, 0);
     return {
       tokens: Math.round(salesValue * 100) / 100,
       stakePercent: Math.round(100 / n),
@@ -934,21 +971,20 @@
   }
 
   // ── Render: sales panel ───────────────────────────────────────────────────
-  function renderSales(ledger, addr) {
+  // Renders from the DB sales list (source of truth), not the chain ledger.
+  function renderSales(sales, addr) {
     var el = document.getElementById('sales-list');
-    var sales = NATIVE
-      ? ledger.filter(function (tx) { return tx.type === 'sale' && tx.from === addr; })
-      : ledger.filter(function (tx) { return tx.type === 'sale'; });
+    var rows = mySales(sales, addr);
 
-    if (!sales.length) {
+    if (!rows.length) {
       el.innerHTML = '<p class="sales-empty">No sales recorded yet.</p>';
       return;
     }
     el.innerHTML = '<div class="sales-list">' +
-      sales.slice(0, 10).map(function (tx) {
+      rows.slice(0, 10).map(function (row) {
         return '<div class="sale-row">' +
-          '<span class="sale-title">' + esc(tx.title) + '</span>' +
-          '<span class="sale-amt">$' + tx.amt.toLocaleString() + '</span>' +
+          '<span class="sale-title">' + esc(row.title) + '</span>' +
+          '<span class="sale-amt">$' + Number(row.amount || 0).toLocaleString() + '</span>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -962,11 +998,9 @@
     { label: 'Reserve',          pct: 10 },
   ];
 
-  function renderTreasury(ledger) {
-    var total = ledger.filter(function (tx) { return tx.type === 'sale'; })
-                      .reduce(function (s, tx) { return s + tx.amt; }, 0);
-    var display = NATIVE ? '$' + Math.round(total).toLocaleString() : '$12,480';
-    document.getElementById('treasury-total').textContent = display;
+  function renderTreasury(sales) {
+    var total = sales.reduce(function (s, row) { return s + Number(row.amount || 0); }, 0);
+    document.getElementById('treasury-total').textContent = '$' + Math.round(total).toLocaleString();
 
     document.getElementById('treasury-bars').innerHTML =
       '<div class="alloc-bars">' +
@@ -981,28 +1015,17 @@
   }
 
   // ── Render: ownership ─────────────────────────────────────────────────────
-  var MOCK_ARTISTS = [
-    { addr: 'ut1stg1abc', pct: 25 },
-    { addr: 'ut1stg2def', pct: 25 },
-    { addr: 'ut1stg3ghi', pct: 25 },
-    { addr: 'ut1stg4jkl', pct: 25 },
-  ];
-
-  function renderOwnership(ledger) {
+  // Renders from the DB enrolments list (source of truth) — each enrolled
+  // artist holds an equal share.
+  function renderOwnership(enrolments) {
     var el = document.getElementById('ownership-bars');
-    var artists;
-
-    if (!NATIVE) {
-      artists = MOCK_ARTISTS;
-    } else {
-      var seen = new Map();
-      ledger.filter(function (tx) { return tx.type === 'join'; }).forEach(function (tx) {
-        if (!seen.has(tx.who)) seen.set(tx.who, true);
-      });
-      var n = Math.max(1, seen.size);
-      var pct = Math.round(100 / n);
-      artists = Array.from(seen.keys()).map(function (addr) { return { addr: addr, pct: pct }; });
-    }
+    var seen = [];
+    enrolments.forEach(function (row) {
+      if (row.addr && seen.indexOf(row.addr) === -1) seen.push(row.addr);
+    });
+    var n = Math.max(1, seen.length);
+    var pct = Math.round(100 / n);
+    var artists = seen.map(function (addr) { return { addr: addr, pct: pct }; });
 
     if (!artists.length) {
       el.innerHTML = '<p class="sales-empty">No artists enrolled yet.</p>';
@@ -1056,12 +1079,15 @@
 
     allBtns.forEach(function (b) { b.disabled = true; });
 
+    // DB write first (source of truth), then a best-effort on-chain receipt.
     api('/api/votes', {
       method: 'POST',
       body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
     }).then(function () {
       var memo = 'vote:' + proposalId + ':' + (direction === 'for' ? 'yes' : 'no');
-      bridgeSend(userAddr, 1, memo);
+      return bridgeSend(userAddr, 1, memo);
+    }).then(function (result) {
+      if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
       return api('/api/proposals');
     }).then(function (data) {
       renderProposals(data.proposals);
@@ -1071,43 +1097,28 @@
     });
   }
 
-  // ── Poll and refresh ───────────────────────────────────────────────────────
-  // After a tx is submitted, poll getTransactions until the hash appears
-  // (NATIVE), or inject a synthetic tx into MOCK_TXS and re-render (demo).
-  function pollAndRefresh(confirmedHash, demoTx, onComplete) {
-    function rerender(ledger) {
-      cachedLedger = ledger;
-      renderStats(computeStats(cachedLedger, userAddr));
-      renderSales(cachedLedger, userAddr);
-      renderTreasury(cachedLedger);
-      renderOwnership(cachedLedger);
+  // ── Refresh dashboard panels from the DB source of truth ─────────────────────
+  // Sales / treasury / ownership / stats come from the DB; the Ledger tab is
+  // refreshed from the chain via getTransactions (which may be empty if the
+  // explorer read-back is unavailable — that's non-fatal).
+  function refreshDashboard() {
+    return Promise.all([
+      api('/api/sales'),
+      api('/api/enrolments'),
+      bridgeGetTxs(),
+    ]).then(function (results) {
+      dbSales = (results[0] && results[0].sales) || [];
+      dbEnrolments = (results[1] && results[1].enrolments) || [];
+      cachedLedger = parseTxs(results[2] || []);
+
+      renderStats(computeStats(dbSales, dbEnrolments, userAddr));
+      renderSales(dbSales, userAddr);
+      renderTreasury(dbSales);
+      renderOwnership(dbEnrolments);
       renderLedger(cachedLedger);
-      if (onComplete) onComplete();
-    }
-
-    if (!NATIVE) {
-      if (demoTx) MOCK_TXS.unshift(demoTx);
-      rerender(parseTxs(MOCK_TXS));
-      return;
-    }
-
-    var attempts = 0;
-    var maxAttempts = 6;
-
-    function attempt() {
-      bridgeGetTxs().then(function (txs) {
-        var found = confirmedHash && txs.some(function (tx) { return tx.hash === confirmedHash; });
-        if (found || attempts >= maxAttempts) {
-          rerender(parseTxs(txs));
-        } else {
-          attempts++;
-          setTimeout(attempt, 1500);
-        }
-      }).catch(function () {
-        rerender(cachedLedger);
-      });
-    }
-    attempt();
+    }).catch(function (err) {
+      console.warn('refreshDashboard error:', err);
+    });
   }
 
   // ── Sale form ──────────────────────────────────────────────────────────────
@@ -1127,26 +1138,32 @@
     var fee = Math.round(amount * GALLERY_FEE_RATE);
     var memo = 'sale:' + title + ':' + amount + ':' + fee;
 
-    bridgeSend(userAddr, 1, memo).then(function (result) {
-      if (!result) {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Record sale';
-        return;
-      }
+    // 1) Persist the sale in the DB (source of truth) — this always "sticks".
+    api('/api/sales', {
+      method: 'POST',
+      body: JSON.stringify({ title: title, amount: amount, fee: fee, seller_addr: userAddr }),
+    }).then(function (resp) {
+      var sale = resp.sale;
       titleInput.value = '';
       amountInput.value = '';
 
-      var demoTx = NATIVE ? null : {
-        memo: memo, amount: 1,
-        hash: result.hash || '',
-        timestamp: Math.floor(Date.now() / 1000),
-        nodeCount: 0, from: userAddr,
-      };
-
-      pollAndRefresh(result.hash || null, demoTx, function () {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Record sale';
+      // 2) Best-effort on-chain receipt. A null result means the node rejected
+      //    the send (e.g. no spendable balance) — the sale is still saved.
+      return bridgeSend(userAddr, 1, memo).then(function (result) {
+        if (result && result.hash && sale && sale.id != null) {
+          api('/api/sales/' + sale.id + '/tx', {
+            method: 'POST',
+            body: JSON.stringify({ tx_hash: result.hash }),
+          }).catch(function () {});
+          showChainNotice('');
+        } else if (!result) {
+          showChainNotice(NO_BALANCE_MSG);
+        }
+        return refreshDashboard();
       });
+    }).then(function () {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Record sale';
     }).catch(function (err) {
       console.error('Sale error:', err);
       submitBtn.disabled = false;
@@ -1184,17 +1201,20 @@
   function loadDashboard() {
     return Promise.all([
       api('/api/proposals'),
+      api('/api/sales'),
+      api('/api/enrolments'),
       bridgeGetTxs(),
     ]).then(function (results) {
       var proposals = results[0].proposals;
-      var txs = results[1];
-      cachedLedger = parseTxs(txs);
+      dbSales = (results[1] && results[1].sales) || [];
+      dbEnrolments = (results[2] && results[2].enrolments) || [];
+      cachedLedger = parseTxs(results[3] || []);
 
       renderProposals(proposals);
-      renderStats(computeStats(cachedLedger, userAddr));
-      renderSales(cachedLedger, userAddr);
-      renderTreasury(cachedLedger);
-      renderOwnership(cachedLedger);
+      renderStats(computeStats(dbSales, dbEnrolments, userAddr));
+      renderSales(dbSales, userAddr);
+      renderTreasury(dbSales);
+      renderOwnership(dbEnrolments);
     }).catch(function (err) {
       console.error('Dashboard load error:', err);
     });
@@ -1220,15 +1240,25 @@
       document.getElementById('addr-pill').textContent = truncAddr(userAddr);
       document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
 
-      // Enrol on-chain if NATIVE and not yet enrolled
+      // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
+      // just POST and let the DB decide if it's a new enrolment. A new enrolment
+      // gets a best-effort on-chain receipt.
       if (NATIVE) {
-        bridgeGetTxs().then(function (txs) {
-          var joined = parseTxs(txs).filter(function (tx) { return tx.type === 'join'; }).map(function (tx) { return tx.who; });
-          if (joined.indexOf(userAddr) === -1) {
+        api('/api/enrolments', {
+          method: 'POST',
+          body: JSON.stringify({ addr: userAddr }),
+        }).then(function (resp) {
+          if (resp && resp.enrolled && resp.enrolment) {
             bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
-              if (result) {
-                pollAndRefresh(result.hash || null, null, null);
+              if (result && result.hash) {
+                api('/api/enrolments/' + resp.enrolment.id + '/tx', {
+                  method: 'POST',
+                  body: JSON.stringify({ tx_hash: result.hash }),
+                }).catch(function () {});
+              } else if (!result) {
+                showChainNotice(NO_BALANCE_MSG);
               }
+              return refreshDashboard();
             }).catch(function () {});
           }
         }).catch(function () {});
@@ -1251,6 +1281,16 @@
   // would always return false because the bridge's iframe relay handshake
   // hasn't completed yet. The mode notice is updated in the enter-btn handler.
   applyTheme();
+
+  // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
+  // screenshots and proposal checks land on a populated dashboard (which
+  // renders from the seeded DB) instead of the gate. No-op without the flag.
+  if (params.get('demo') === '1') {
+    setTimeout(function () {
+      var enterBtn = document.getElementById('enter-btn');
+      if (enterBtn) enterBtn.click();
+    }, 0);
+  }
 
 })();
 </script>
