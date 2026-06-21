@@ -637,6 +637,143 @@
       padding: 1.5rem 0.75rem;
     }
 
+    /* ── Forum ── */
+    .forum-new-card { margin-bottom: 1.25rem; }
+
+    #forum-thread-form { display: flex; flex-direction: column; gap: 0.5rem; }
+
+    #forum-thread-form input,
+    #forum-thread-form textarea,
+    #forum-reply-form textarea {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      resize: vertical;
+    }
+    #forum-thread-form input:focus,
+    #forum-thread-form textarea:focus,
+    #forum-reply-form textarea:focus { border-color: var(--accent); }
+    #forum-thread-form input::placeholder,
+    #forum-thread-form textarea::placeholder,
+    #forum-reply-form textarea::placeholder { color: var(--ink-2); }
+
+    #forum-thread-form button,
+    #forum-reply-form button {
+      align-self: flex-start;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem 1.1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #forum-thread-form button:hover:not(:disabled),
+    #forum-reply-form button:hover:not(:disabled) { opacity: 0.82; }
+    #forum-thread-form button:disabled,
+    #forum-reply-form button:disabled { opacity: 0.45; cursor: default; }
+
+    .thread-row {
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .thread-row:hover { border-color: var(--accent); }
+
+    .thread-row-title {
+      font-family: var(--serif);
+      font-size: 1.2rem;
+      font-weight: 600;
+      line-height: 1.25;
+      margin-bottom: 0.3rem;
+    }
+
+    .thread-row-meta {
+      font-size: 0.77rem;
+      color: var(--ink-2);
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .thread-row-meta .thread-author { color: var(--ink); }
+
+    .forum-empty { font-size: 0.84rem; color: var(--ink-2); padding: 0.35rem 0; }
+
+    .forum-back {
+      background: none;
+      border: none;
+      color: var(--ink-2);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.25rem 0;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .forum-back:hover { color: var(--ink); }
+
+    .thread-detail-title {
+      font-family: var(--serif);
+      font-size: 2rem;
+      font-weight: 400;
+      line-height: 1.2;
+      margin-bottom: 0.3rem;
+    }
+
+    .post {
+      border-bottom: 1px solid var(--line);
+      padding: 0.9rem 0;
+    }
+    .post:last-of-type { border-bottom: none; }
+
+    .post-meta {
+      font-size: 0.75rem;
+      color: var(--ink-2);
+      margin-bottom: 0.35rem;
+    }
+    .post-meta .post-author { color: var(--ink); font-weight: 500; }
+
+    .post-body {
+      font-size: 0.9rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .post-op { border-bottom: 2px solid var(--line); margin-bottom: 0.5rem; }
+
+    .replies-label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--ink-2);
+      margin: 1rem 0 0.25rem;
+    }
+
+    #forum-reply-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+    }
+
     /* ── Responsive ── */
     @media (max-width: 680px) {
       .panels { grid-template-columns: 1fr; }
@@ -657,6 +794,7 @@
   <nav>
     <button id="tab-dash" class="tab active">Dashboard</button>
     <button id="tab-ledger" class="tab">Ledger</button>
+    <button id="tab-forum" class="tab">Forum</button>
   </nav>
   <div class="header-right">
     <button id="theme-toggle" aria-label="Toggle theme">☾</button>
@@ -760,6 +898,32 @@
       <tr><td colspan="5" class="ledger-empty">Loading…</td></tr>
     </tbody>
   </table>
+</div>
+
+<!-- View: Forum -->
+<div id="view-forum" class="view hidden">
+  <!-- Sub-view: thread list -->
+  <div id="forum-list-view">
+    <div class="dash-header">
+      <h1>Forum</h1>
+      <p class="subtitle">A space for the collective to talk shop.</p>
+    </div>
+    <div class="card forum-new-card">
+      <h2>Start a thread</h2>
+      <form id="forum-thread-form" autocomplete="off">
+        <input type="text" id="forum-thread-title" placeholder="Thread title" required maxlength="120">
+        <textarea id="forum-thread-body" placeholder="What's on your mind?" required maxlength="5000" rows="3"></textarea>
+        <button type="submit">Post thread</button>
+      </form>
+    </div>
+    <div id="forum-threads"><p class="proposal-desc">Loading…</p></div>
+  </div>
+
+  <!-- Sub-view: single thread -->
+  <div id="forum-thread-view" class="hidden">
+    <button id="forum-back" class="forum-back">← Back to forum</button>
+    <div id="forum-thread-detail"></div>
+  </div>
 </div>
 
 <script>
@@ -999,14 +1163,14 @@
           '<div class="vote-bar-against" style="width:' + againstPct + '%"></div>' +
         '</div>' +
         '<div class="vote-counts">' +
-          '<span class="for-count">' + forCount + ' For</span>' +
-          '<span class="against-count">' + againstCount + ' Against</span>' +
+          '<span class="for-count">' + forCount + ' Yes</span>' +
+          '<span class="against-count">' + againstCount + ' No</span>' +
         '</div>' +
         '<div class="vote-buttons">' +
           '<button class="vote-btn for-btn' + (p.my_vote === 'for' ? ' active' : '') +
-            '" data-id="' + p.id + '" data-dir="for">For</button>' +
+            '" data-id="' + p.id + '" data-dir="for">Yes</button>' +
           '<button class="vote-btn against-btn' + (p.my_vote === 'against' ? ' active' : '') +
-            '" data-id="' + p.id + '" data-dir="against">Against</button>' +
+            '" data-id="' + p.id + '" data-dir="against">No</button>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -1217,9 +1381,161 @@
     });
   });
 
+  // ── Forum ────────────────────────────────────────────────────────────────
+  // Pure DB-backed discussion board (no on-chain component). Two sub-views
+  // inside #view-forum — a thread list and a single-thread detail — toggled
+  // here in JS. Postgres returns created_at as an ISO string, so formatStamp
+  // converts it before reusing formatTime (which assumes epoch numbers).
+  function formatStamp(ts) {
+    if (ts == null) return '';
+    var ms = typeof ts === 'number' ? (ts > 1e10 ? ts : ts * 1000) : new Date(ts).getTime();
+    if (isNaN(ms)) return '';
+    return formatTime(ms);
+  }
+
+  function showForumList() {
+    document.getElementById('forum-list-view').classList.remove('hidden');
+    document.getElementById('forum-thread-view').classList.add('hidden');
+  }
+
+  function showForumThread() {
+    document.getElementById('forum-list-view').classList.add('hidden');
+    document.getElementById('forum-thread-view').classList.remove('hidden');
+  }
+
+  function renderThreads(threads) {
+    var el = document.getElementById('forum-threads');
+    if (!threads.length) {
+      el.innerHTML = '<p class="forum-empty">No threads yet — start the first one above.</p>';
+      return;
+    }
+    el.innerHTML = threads.map(function (t) {
+      var count = t.reply_count || 0;
+      var replyLabel = count === 1 ? '1 reply' : count + ' replies';
+      return '<div class="thread-row" data-id="' + t.id + '">' +
+        '<div class="thread-row-title">' + esc(t.title) + '</div>' +
+        '<div class="thread-row-meta">' +
+          '<span class="thread-author">' + esc(t.username) + '</span>' +
+          '<span>' + replyLabel + '</span>' +
+          '<span>' + esc(formatStamp(t.last_activity || t.created_at)) + '</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    el.querySelectorAll('.thread-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        openThread(parseInt(row.dataset.id, 10));
+      });
+    });
+  }
+
+  function loadThreads() {
+    var el = document.getElementById('forum-threads');
+    return api('/api/threads').then(function (data) {
+      renderThreads((data && data.threads) || []);
+    }).catch(function (err) {
+      console.error('Forum threads load error:', err);
+      el.innerHTML = '<p class="forum-empty">Could not load the forum. Please try again.</p>';
+    });
+  }
+
+  function renderPost(author, ts, body, isOp) {
+    return '<div class="post' + (isOp ? ' post-op' : '') + '">' +
+      '<div class="post-meta"><span class="post-author">' + esc(author) + '</span> · ' +
+        esc(formatStamp(ts)) + '</div>' +
+      '<div class="post-body">' + esc(body) + '</div>' +
+    '</div>';
+  }
+
+  function renderThreadDetail(thread, replies) {
+    var el = document.getElementById('forum-thread-detail');
+    var html = '<div class="thread-detail-title">' + esc(thread.title) + '</div>' +
+      renderPost(thread.username, thread.created_at, thread.body, true);
+
+    html += '<div class="replies-label">' +
+      (replies.length === 1 ? '1 reply' : replies.length + ' replies') + '</div>';
+    if (replies.length) {
+      html += replies.map(function (r) {
+        return renderPost(r.username, r.created_at, r.body, false);
+      }).join('');
+    } else {
+      html += '<p class="forum-empty">No replies yet — be the first.</p>';
+    }
+
+    html += '<form id="forum-reply-form" autocomplete="off">' +
+      '<textarea id="forum-reply-body" placeholder="Write a reply…" required maxlength="5000" rows="3"></textarea>' +
+      '<button type="submit">Post reply</button>' +
+    '</form>';
+
+    el.innerHTML = html;
+
+    document.getElementById('forum-reply-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bodyInput = document.getElementById('forum-reply-body');
+      var submitBtn = e.target.querySelector('button[type="submit"]');
+      var body = bodyInput.value.trim();
+      if (!body) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Posting…';
+      api('/api/threads/' + thread.id + '/replies', {
+        method: 'POST',
+        body: JSON.stringify({ body: body }),
+      }).then(function () {
+        return openThread(thread.id);
+      }).catch(function (err) {
+        console.error('Reply error:', err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Post reply';
+      });
+    });
+  }
+
+  function openThread(id) {
+    showForumThread();
+    var el = document.getElementById('forum-thread-detail');
+    el.innerHTML = '<p class="forum-empty">Loading…</p>';
+    return api('/api/threads/' + id).then(function (data) {
+      renderThreadDetail(data.thread, data.replies || []);
+    }).catch(function (err) {
+      console.error('Thread load error:', err);
+      el.innerHTML = '<p class="forum-empty">Could not load this thread.</p>';
+    });
+  }
+
+  document.getElementById('forum-back').addEventListener('click', function () {
+    showForumList();
+    loadThreads();
+  });
+
+  document.getElementById('forum-thread-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var titleInput = document.getElementById('forum-thread-title');
+    var bodyInput = document.getElementById('forum-thread-body');
+    var submitBtn = e.target.querySelector('button[type="submit"]');
+    var title = titleInput.value.trim();
+    var body = bodyInput.value.trim();
+    if (!title || !body) return;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Posting…';
+    api('/api/threads', {
+      method: 'POST',
+      body: JSON.stringify({ title: title, body: body }),
+    }).then(function (resp) {
+      titleInput.value = '';
+      bodyInput.value = '';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Post thread';
+      if (resp && resp.thread) return openThread(resp.thread.id);
+    }).catch(function (err) {
+      console.error('New thread error:', err);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Post thread';
+    });
+  });
+
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-dash', 'view-ledger'].forEach(function (id) {
+    ['view-gate', 'view-dash', 'view-ledger', 'view-forum'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -1231,6 +1547,7 @@
     });
     document.getElementById('tab-dash').classList.toggle('active', viewId === 'view-dash');
     document.getElementById('tab-ledger').classList.toggle('active', viewId === 'view-ledger');
+    document.getElementById('tab-forum').classList.toggle('active', viewId === 'view-forum');
   }
 
   // ── Tab listeners ──────────────────────────────────────────────────────────
@@ -1241,6 +1558,12 @@
   document.getElementById('tab-ledger').addEventListener('click', function () {
     showView('view-ledger');
     renderLedger(cachedLedger);
+  });
+
+  document.getElementById('tab-forum').addEventListener('click', function () {
+    showView('view-forum');
+    showForumList();
+    loadThreads();
   });
 
   // ── Dashboard load ─────────────────────────────────────────────────────────

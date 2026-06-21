@@ -222,6 +222,76 @@ app.post('/api/enrolments/:id/tx', async (req, res) => {
   }
 });
 
+// ── Forum (public discussion board; pure DB-backed, no on-chain component). ───
+app.get('/api/threads', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        t.id, t.user_id, t.username, t.title, t.body, t.created_at,
+        COUNT(r.id)::int AS reply_count,
+        GREATEST(t.created_at, COALESCE(MAX(r.created_at), t.created_at)) AS last_activity
+      FROM forum_threads t
+      LEFT JOIN forum_replies r ON r.thread_id = t.id
+      GROUP BY t.id
+      ORDER BY last_activity DESC, t.id DESC
+    `);
+    res.json({ threads: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/threads/:id', async (req, res) => {
+  try {
+    const threadRes = await pool.query(`
+      SELECT id, user_id, username, title, body, created_at
+      FROM forum_threads WHERE id = $1
+    `, [req.params.id]);
+    if (!threadRes.rows.length) return res.status(404).json({ error: 'Thread not found' });
+    const repliesRes = await pool.query(`
+      SELECT id, thread_id, user_id, username, body, created_at
+      FROM forum_replies WHERE thread_id = $1
+      ORDER BY created_at ASC, id ASC
+    `, [req.params.id]);
+    res.json({ thread: threadRes.rows[0], replies: repliesRes.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/threads', async (req, res) => {
+  const title = String((req.body && req.body.title) || '').trim();
+  const body = String((req.body && req.body.body) || '').trim();
+  if (!title || !body) return res.status(400).json({ error: 'Title and message are required' });
+  try {
+    const { rows } = await pool.query(`
+      INSERT INTO forum_threads (user_id, username, title, body)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, user_id, username, title, body, created_at
+    `, [req.user.id, req.user.username, title.slice(0, 255), body.slice(0, 5000)]);
+    res.json({ thread: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/threads/:id/replies', async (req, res) => {
+  const body = String((req.body && req.body.body) || '').trim();
+  if (!body) return res.status(400).json({ error: 'Reply cannot be empty' });
+  try {
+    const exists = await pool.query(`SELECT id FROM forum_threads WHERE id = $1`, [req.params.id]);
+    if (!exists.rows.length) return res.status(404).json({ error: 'Thread not found' });
+    const { rows } = await pool.query(`
+      INSERT INTO forum_replies (thread_id, user_id, username, body)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, thread_id, user_id, username, body, created_at
+    `, [req.params.id, req.user.id, req.user.username, body.slice(0, 5000)]);
+    res.json({ reply: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
@@ -294,24 +364,138 @@ async function start() {
     )
   `);
 
-  // Seed the initial proposal in all environments — it's a new table with no
-  // prior production data, so it needs seeding on first deploy everywhere.
+  // Forum: discussion board for the collective. Public — every member reads
+  // the board in-app (no auth/financial/personal data), so NO 'staging:private'
+  // comment: these tables replicate to staging normally. forum_replies →
+  // forum_threads is a public→public FK (satisfies the linter rule).
   await pool.query(`
-    INSERT INTO governance_proposals (id, title, description)
-    VALUES (1, 'Fee Split Adjustment',
-      'Proposal to adjust gallery revenue distribution: raise Artist dividends from 50% to 55%, reducing Reserve from 15% to 10%. This change better rewards participating artists for their contributions.')
-    ON CONFLICT (id) DO NOTHING
+    CREATE TABLE IF NOT EXISTS forum_threads (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS forum_replies (
+      id SERIAL PRIMARY KEY,
+      thread_id INTEGER NOT NULL REFERENCES forum_threads(id),
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  // ── Governance proposals seed ───────────────────────────────────────────────
+  // Replace the single legacy proposal with six Yes/No proposals. Internally
+  // votes still use direction 'for'/'against' (Yes=for, No=against) — only the
+  // labels change in the UI — so the existing vote endpoint and on-chain memo
+  // are reused unchanged.
+  //
+  // Re-run-safe migration (runs in all environments — these are product content
+  // with no prior prod data, like the original seed):
+  //   1. Retire the legacy proposal keyed on its TITLE (never the bare id=1, or
+  //      a redeploy would wipe real votes on the new proposal #1). After the
+  //      first boot the title is gone, so subsequent boots delete nothing.
+  //   2. Insert the six proposals at fixed ids with ON CONFLICT DO NOTHING, so
+  //      later boots are no-ops and accumulated votes are preserved.
+  //   3. Bump the serial sequence past the explicit ids (belt-and-suspenders;
+  //      nothing inserts proposals via the API today).
+  await pool.query(`DELETE FROM votes WHERE proposal_id IN (SELECT id FROM governance_proposals WHERE title = 'Fee Split Adjustment')`);
+  await pool.query(`DELETE FROM governance_proposals WHERE title = 'Fee Split Adjustment'`);
+
+  const seededProposals = [
+    [1, 'Set the platform fee to 20%', "Lower the gallery's cut on every sale to a flat 20%."],
+    [2, 'Set the platform fee to 30%', "Raise the gallery's cut on every sale to a flat 30% to fund more programs."],
+    [3, 'Allocate 40% of the treasury to marketing & reach', 'Commit 40% of the collective treasury to advertising, partnerships and audience growth.'],
+    [4, 'Introduce a 2% artist dividend from each sale', 'Pay every enrolled artist a 2% dividend funded from each sale across the collective.'],
+    [5, 'Feature one rising artist on the homepage each week', 'Spotlight a different emerging member on the public homepage every week.'],
+    [6, 'Open the collective to outside collectors as non-voting members', 'Let outside collectors join as non-voting members with purchase access but no governance vote.'],
+  ];
+  for (const [id, title, description] of seededProposals) {
+    await pool.query(`
+      INSERT INTO governance_proposals (id, title, description)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (id) DO NOTHING
+    `, [id, title, description]);
+  }
+  await pool.query(`SELECT setval(pg_get_serial_sequence('governance_proposals', 'id'), GREATEST((SELECT MAX(id) FROM governance_proposals), 1))`);
+
+  // ── Forum starter threads seed ──────────────────────────────────────────────
+  // Seeded in all environments (product content; forum tables are public so a
+  // fresh staging container starts empty until this runs). Idempotent via fixed
+  // ids + ON CONFLICT DO NOTHING; authored by a neutral house account so no real
+  // member is impersonated. Sequences bumped past the explicit ids afterwards.
+  const HOUSE_ID = 9000;
+  const HOUSE_NAME = 'collective';
+  const seededThreads = [
+    [1, 'What should our platform fee be?',
+      'There are two fee proposals up for a vote right now — 20% and 30%. What feels fair to you as a working artist? Lower keeps more in our pockets per sale; higher funds shared marketing and reach. Curious where people land.'],
+    [2, "Ideas for next month's featured wall",
+      'We rotate a featured wall each month. Drop your themes or specific pieces you think should be up next — landscapes, abstracts, a newcomer showcase? All ideas welcome.'],
+    [3, 'How do we attract more collectors?',
+      "Sales have been steady but we could grow the collector base. What has worked for you elsewhere — social, open studios, collaborations, referral perks? Let's pool tactics."],
+  ];
+  for (const [id, title, body] of seededThreads) {
+    await pool.query(`
+      INSERT INTO forum_threads (id, user_id, username, title, body)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (id) DO NOTHING
+    `, [id, HOUSE_ID, HOUSE_NAME, title, body]);
+  }
+  const seededReplies = [
+    [1, 1, 9001, 'mara-vance', 'I lean 20%. We already cover our own materials; keeping more per sale matters most for the smaller artists.'],
+    [2, 1, 9002, 'jonah-reed', 'Counterpoint: 30% only works if the extra actually goes to reach. If marketing is funded and transparent I could be convinced.'],
+    [3, 2, 9003, 'lina-okafor', 'A "newcomers" wall — spotlight artists who joined in the last two months. Great way to welcome people.'],
+    [4, 2, 9001, 'mara-vance', "Love that. I'd also vote for a colour-themed month — everything in blues and greens would look striking together."],
+    [5, 3, 9004, 'theo-blanc', 'Open studio nights did wonders for a collective I was in before. Pair it with a small online preview the week prior.'],
+    [6, 3, 9002, 'jonah-reed', 'Referral perks for existing collectors too — a small discount when they bring someone who buys.'],
+  ];
+  for (const [id, threadId, uid, uname, body] of seededReplies) {
+    await pool.query(`
+      INSERT INTO forum_replies (id, thread_id, user_id, username, body)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (id) DO NOTHING
+    `, [id, threadId, uid, uname, body]);
+  }
+  await pool.query(`SELECT setval(pg_get_serial_sequence('forum_threads', 'id'), GREATEST((SELECT MAX(id) FROM forum_threads), 1))`);
+  await pool.query(`SELECT setval(pg_get_serial_sequence('forum_replies', 'id'), GREATEST((SELECT MAX(id) FROM forum_replies), 1))`);
+
   if (IS_STAGING) {
-    // Seed mock votes so the progress bar shows a realistic state in staging.
-    // (votes is staging:private — no rows copy from prod)
+    // Seed mock votes so each proposal shows a distinct live Yes/No tally in
+    // staging. (votes is staging:private — no rows copy from prod.) direction
+    // stays 'for'/'against' internally; the UI renders these as Yes/No.
     const mockVotes = [
+      // Proposal 1 — Set fee to 20%: leans Yes
       [1, 9001, 'staging-artist-1', 'for'],
       [1, 9002, 'staging-artist-2', 'for'],
       [1, 9003, 'staging-artist-3', 'for'],
-      [1, 9004, 'staging-artist-4', 'for'],
-      [1, 9005, 'staging-artist-5', 'against'],
+      [1, 9004, 'staging-artist-4', 'against'],
+      // Proposal 2 — Set fee to 30%: leans No
+      [2, 9001, 'staging-artist-1', 'against'],
+      [2, 9002, 'staging-artist-2', 'against'],
+      [2, 9003, 'staging-artist-3', 'for'],
+      // Proposal 3 — 40% to marketing: split
+      [3, 9001, 'staging-artist-1', 'for'],
+      [3, 9002, 'staging-artist-2', 'against'],
+      [3, 9004, 'staging-artist-4', 'for'],
+      // Proposal 4 — 2% artist dividend: strong Yes
+      [4, 9001, 'staging-artist-1', 'for'],
+      [4, 9002, 'staging-artist-2', 'for'],
+      [4, 9003, 'staging-artist-3', 'for'],
+      [4, 9005, 'staging-artist-5', 'for'],
+      // Proposal 5 — weekly featured artist: leans Yes
+      [5, 9002, 'staging-artist-2', 'for'],
+      [5, 9003, 'staging-artist-3', 'for'],
+      [5, 9005, 'staging-artist-5', 'against'],
+      // Proposal 6 — open to outside collectors: leans No
+      [6, 9001, 'staging-artist-1', 'against'],
+      [6, 9003, 'staging-artist-3', 'against'],
+      [6, 9004, 'staging-artist-4', 'for'],
     ];
     for (const [pid, uid, uname, dir] of mockVotes) {
       await pool.query(`
