@@ -874,6 +874,24 @@
     return Promise.resolve(MOCK_TXS);
   }
 
+  function fetchApiSales(addr) {
+    if (NATIVE) {
+      return fetch('https://artists-collective.pages.dev/api/artist?addr=' + encodeURIComponent(addr))
+        .then(function (res) {
+          if (!res.ok) return [];
+          return res.json().then(function (data) {
+            return Array.isArray(data && data.sales) ? data.sales : [];
+          });
+        })
+        .catch(function () { return []; });
+    }
+    return Promise.resolve([
+      { title: 'Staging demo — Autumn Light #1',   buyer: 'staging-demo-buyer-a', price: 450 },
+      { title: 'Staging demo — Blue Resonance #7', buyer: 'staging-demo-buyer-b', price: 280 },
+      { title: 'Staging demo — Quiet Tide #3',     buyer: 'staging-demo-buyer-c', price: 620 },
+    ]);
+  }
+
   function bridgeSend(dest, amount, memo) {
     if (NATIVE) {
       return window.sendTransaction(dest, amount, memo).catch(function (err) {
@@ -1017,10 +1035,9 @@
   }
 
   // ── Render: sales panel ───────────────────────────────────────────────────
-  // Renders from the DB sales list (source of truth), not the chain ledger.
-  function renderSales(sales, addr) {
+  // Renders from the website API (fetchApiSales); rows are {title, buyer, price}.
+  function renderSales(rows) {
     var el = document.getElementById('sales-list');
-    var rows = mySales(sales, addr);
 
     if (!rows.length) {
       el.innerHTML = '<p class="sales-empty">No sales recorded yet.</p>';
@@ -1029,8 +1046,9 @@
     el.innerHTML = '<div class="sales-list">' +
       rows.slice(0, 10).map(function (row) {
         return '<div class="sale-row">' +
-          '<span class="sale-title">' + esc(row.title) + '</span>' +
-          '<span class="sale-amt">$' + Number(row.amount || 0).toLocaleString() + '</span>' +
+          '<span class="sale-title">' +
+            esc(row.title) + ' · ' + esc(row.buyer) + ' · $' + Number(row.price || 0).toLocaleString() +
+          '</span>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -1152,13 +1170,15 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
+      fetchApiSales(userAddr),
     ]).then(function (results) {
       dbSales = (results[0] && results[0].sales) || [];
       dbEnrolments = (results[1] && results[1].enrolments) || [];
       cachedLedger = parseTxs(results[2] || []);
+      var apiSales = results[3] || [];
 
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(dbSales, userAddr);
+      renderSales(apiSales);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
       renderLedger(cachedLedger);
@@ -1250,15 +1270,17 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
+      fetchApiSales(userAddr),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
       dbEnrolments = (results[2] && results[2].enrolments) || [];
       cachedLedger = parseTxs(results[3] || []);
+      var apiSales = results[4] || [];
 
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(dbSales, userAddr);
+      renderSales(apiSales);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
     }).catch(function (err) {
