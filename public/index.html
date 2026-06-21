@@ -228,7 +228,25 @@
       line-height: 1.55;
     }
 
-    #enter-btn {
+    .onboarding-steps {
+      text-align: left;
+      max-width: 22rem;
+      width: 100%;
+    }
+    .onboarding-steps .steps-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--ink-2);
+      margin-bottom: 0.5rem;
+    }
+    .onboarding-steps ol {
+      padding-left: 1.25rem;
+      color: var(--ink-2);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    #enrol-btn {
       background: var(--ink);
       color: var(--paper);
       border: none;
@@ -239,10 +257,29 @@
       padding: 0.72rem 1.8rem;
       cursor: pointer;
       transition: opacity 0.15s;
-      margin-top: 0.25rem;
     }
-    #enter-btn:hover { opacity: 0.82; }
+    #enrol-btn:hover { opacity: 0.82; }
+    #enrol-btn:disabled { opacity: 0.45; cursor: default; }
+
+    #enter-btn {
+      background: transparent;
+      color: var(--ink);
+      border: 1.5px solid var(--line);
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.72rem 1.8rem;
+      cursor: pointer;
+      transition: opacity 0.15s, border-color 0.15s;
+    }
+    #enter-btn:hover { opacity: 0.82; border-color: var(--ink-2); }
     #enter-btn:disabled { opacity: 0.45; cursor: default; }
+
+    .gate-helper {
+      font-size: 0.78rem;
+      color: var(--ink-2);
+    }
 
     #mode-notice {
       font-size: 0.78rem;
@@ -629,11 +666,20 @@
 
 <!-- View: Gate -->
 <div id="view-gate">
-  <h1>Your studio, <em>on Usernode.</em></h1>
-  <p class="subtitle">The community-owned art gallery. Create, sell, and govern together.</p>
+  <h1>The Artists' Collective</h1>
+  <p class="subtitle">A community-owned art gallery.</p>
+  <div class="onboarding-steps">
+    <p class="steps-label">New here? Two steps to join:</p>
+    <ol>
+      <li>Click <strong>Create your artist account →</strong> — registers you on-chain and opens the membership page.</li>
+      <li>Return here and click <strong>Enter the studio →</strong> to access your dashboard.</li>
+    </ol>
+  </div>
+  <button id="enrol-btn">Create your artist account →</button>
   <button id="enter-btn">Enter the studio →</button>
   <p id="enter-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:-0.25rem"></p>
   <p id="mode-notice"></p>
+  <p class="gate-helper">Already a member? Just tap Enter the studio.</p>
 </div>
 
 <!-- View: Dashboard -->
@@ -1271,6 +1317,49 @@
       console.error('Entry error:', err);
       btn.disabled = false;
       btn.textContent = 'Enter the studio →';
+      errEl.textContent = 'Could not connect to your wallet. Please try again.';
+      errEl.classList.remove('hidden');
+    });
+  });
+
+  // ── Create artist account ─────────────────────────────────────────────────
+  document.getElementById('enrol-btn').addEventListener('click', function () {
+    var btn = document.getElementById('enrol-btn');
+    var errEl = document.getElementById('enter-error');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Registering on-chain…';
+
+    NATIVE = !!(window.usernode && window.usernode.isNative);
+
+    Promise.all([
+      bridgeGetAddress(),
+      api('/api/me').catch(function () { return {}; }),
+    ]).then(function (results) {
+      var addr = results[0];
+      var me = results[1] || {};
+      var name = me.username || addr;
+      var targetUrl = 'https://artists-collective.pages.dev/join'
+        + '?addr=' + encodeURIComponent(addr)
+        + '&name=' + encodeURIComponent(name);
+
+      // sendTransaction resolves only after on-chain confirmation; there is no
+      // broadcast callback. Race it against a 10s timeout so the tab opens at
+      // approval/broadcast time rather than waiting for confirmation.
+      var txPromise = bridgeSend(addr, 1, 'ENROL:' + name);
+      var timeoutPromise = new Promise(function (resolve) {
+        setTimeout(resolve, 10000);
+      });
+
+      Promise.race([txPromise, timeoutPromise]).then(function () {
+        window.open(targetUrl, '_blank');
+        btn.disabled = false;
+        btn.textContent = 'Create your artist account →';
+      });
+    }).catch(function (err) {
+      console.error('Enrol error:', err);
+      btn.disabled = false;
+      btn.textContent = 'Create your artist account →';
       errEl.textContent = 'Could not connect to your wallet. Please try again.';
       errEl.classList.remove('hidden');
     });
