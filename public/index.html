@@ -1038,6 +1038,28 @@
     return Promise.resolve(MOCK_TXS);
   }
 
+  // Fetch sales for the connected wallet from the collective's public website
+  // API (replaces the dApp-store sales feed for the "Your sales" panel). In
+  // demo mode (no real wallet) returns obviously-fake staging rows so the
+  // panel renders. Any error / non-OK status resolves to [].
+  function fetchApiSales(addr) {
+    if (NATIVE) {
+      return fetch('https://artists-collective.pages.dev/api/artist?addr=' + encodeURIComponent(addr))
+        .then(function (res) {
+          if (!res.ok) return [];
+          return res.json().then(function (data) {
+            return Array.isArray(data && data.sales) ? data.sales : [];
+          });
+        })
+        .catch(function () { return []; });
+    }
+    return Promise.resolve([
+      { title: 'Staging demo — Reach',            buyer: 'Galerie Onze',          price: 2600 },
+      { title: 'Staging demo — Autumn Light #1',  buyer: 'staging-demo-buyer-a',  price: 450 },
+      { title: 'Staging demo — Quiet Tide #3',    buyer: 'staging-demo-buyer-c',  price: 620 },
+    ]);
+  }
+
   function bridgeSend(dest, amount, memo) {
     if (NATIVE) {
       return window.sendTransaction(dest, amount, memo).catch(function (err) {
@@ -1181,10 +1203,10 @@
   }
 
   // ── Render: sales panel ───────────────────────────────────────────────────
-  // Renders from the DB sales list (source of truth), not the chain ledger.
-  function renderSales(sales, addr) {
+  // Renders sales from the collective's website API (fetchApiSales). Rows are
+  // already scoped to the connected wallet, so no client-side filtering here.
+  function renderSales(rows) {
     var el = document.getElementById('sales-list');
-    var rows = mySales(sales, addr);
 
     if (!rows.length) {
       el.innerHTML = '<p class="sales-empty">No sales recorded yet.</p>';
@@ -1193,8 +1215,9 @@
     el.innerHTML = '<div class="sales-list">' +
       rows.slice(0, 10).map(function (row) {
         return '<div class="sale-row">' +
-          '<span class="sale-title">' + esc(row.title) + '</span>' +
-          '<span class="sale-amt">$' + Number(row.amount || 0).toLocaleString() + '</span>' +
+          '<span class="sale-title">' +
+            esc(row.title) + ' · ' + esc(row.buyer) + ' · $' + Number(row.price || 0).toLocaleString() +
+          '</span>' +
         '</div>';
       }).join('') +
     '</div>';
@@ -1316,13 +1339,15 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
+      fetchApiSales(userAddr),
     ]).then(function (results) {
       dbSales = (results[0] && results[0].sales) || [];
       dbEnrolments = (results[1] && results[1].enrolments) || [];
       cachedLedger = parseTxs(results[2] || []);
+      var apiSales = results[3] || [];
 
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(dbSales, userAddr);
+      renderSales(apiSales);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
       renderLedger(cachedLedger);
@@ -1573,15 +1598,17 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
+      fetchApiSales(userAddr),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
       dbEnrolments = (results[2] && results[2].enrolments) || [];
       cachedLedger = parseTxs(results[3] || []);
+      var apiSales = results[4] || [];
 
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(dbSales, userAddr);
+      renderSales(apiSales);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
     }).catch(function (err) {
