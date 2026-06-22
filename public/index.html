@@ -1987,24 +1987,53 @@
   // Calls the app's own backend (server-side bearer call to the gallery site);
   // the wallet/node is never used in the browser. The returned code is
   // one-time-display — re-tapping replaces any previous code on the website.
-  function copyToClipboard(text) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      return navigator.clipboard.writeText(text);
-    }
+  // Robust copy: inside the iframe navigator.clipboard is often unavailable or
+  // rejects on a permissions-policy denial, so always fall back to a focused/
+  // selected textarea + execCommand('copy'). Only reject if BOTH paths fail.
+  function legacyCopy(text) {
     return new Promise(function (resolve, reject) {
       try {
         var ta = document.createElement('textarea');
         ta.value = text;
         ta.setAttribute('readonly', '');
-        ta.style.position = 'absolute';
-        ta.style.left = '-9999px';
+        // Keep it on-screen but visually inert so the selection/copy is honored
+        // (off-screen elements are skipped by some mobile webviews).
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '0';
+        ta.style.width = '1px';
+        ta.style.height = '1px';
+        ta.style.padding = '0';
+        ta.style.border = 'none';
+        ta.style.outline = 'none';
+        ta.style.boxShadow = 'none';
+        ta.style.background = 'transparent';
+        ta.style.opacity = '0';
         document.body.appendChild(ta);
+        ta.focus();
         ta.select();
-        document.execCommand('copy');
+        if (ta.setSelectionRange) {
+          ta.setSelectionRange(0, text.length);
+        }
+        var ok = document.execCommand('copy');
         document.body.removeChild(ta);
-        resolve();
+        if (ok) { resolve(); } else { reject(new Error('execCommand copy returned false')); }
       } catch (e) { reject(e); }
     });
+  }
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      // writeText can throw synchronously or reject async depending on the
+      // webview — guard both, then fall back to the legacy path.
+      try {
+        return Promise.resolve(navigator.clipboard.writeText(text))
+          .catch(function () { return legacyCopy(text); });
+      } catch (e) {
+        return legacyCopy(text);
+      }
+    }
+    return legacyCopy(text);
   }
 
   function bindCopyButton(btnEl, value, label) {
@@ -2042,7 +2071,7 @@
 
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
-            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener">' + esc(loginUrl) + '</a></p>' +
+            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
           '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span>' +
             '   Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
           '<div class="web-access-actions">' +
