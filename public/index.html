@@ -318,6 +318,70 @@
       margin-top: 0.2rem;
     }
 
+    /* ── Profile avatar ── */
+    .dash-id {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .avatar {
+      position: relative;
+      flex: 0 0 auto;
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 2px var(--card-border, rgba(255,255,255,0.12));
+    }
+    .avatar-initials {
+      font-family: var(--serif);
+      font-size: 1.5rem;
+      font-weight: 500;
+      color: #fff;
+      letter-spacing: 0.02em;
+      user-select: none;
+    }
+    .avatar-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+    }
+    .avatar.has-img .avatar-img { display: block; }
+    .avatar.has-img .avatar-initials { display: none; }
+    .avatar.loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.45);
+      border-radius: 50%;
+    }
+    .dash-id-text { min-width: 0; }
+    .avatar-actions { margin-top: 0.5rem; }
+    #avatar-change-btn {
+      font: inherit;
+      font-size: 0.82rem;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 0.3rem 0.8rem;
+      cursor: pointer;
+    }
+    #avatar-change-btn:hover:not(:disabled) { opacity: 0.82; }
+    #avatar-change-btn:disabled { opacity: 0.45; cursor: default; }
+    #avatar-error {
+      color: var(--accent);
+      font-size: 0.8rem;
+      margin-top: 0.4rem;
+    }
+
     /* ── Stats grid ── */
     .stats-grid {
       display: grid;
@@ -1040,8 +1104,21 @@
 <!-- View: Dashboard -->
 <div id="view-dash" class="view hidden">
   <div class="dash-header">
-    <h1>Studio dashboard</h1>
-    <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
+    <div class="dash-id">
+      <div class="avatar" id="avatar">
+        <span class="avatar-initials" id="avatar-initials">·</span>
+        <img class="avatar-img" id="avatar-img" alt="Your profile picture" />
+      </div>
+      <div class="dash-id-text">
+        <h1>Studio dashboard</h1>
+        <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
+        <div class="avatar-actions">
+          <button id="avatar-change-btn" type="button">Change profile picture</button>
+          <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" />
+        </div>
+        <p id="avatar-error" class="hidden"></p>
+      </div>
+    </div>
   </div>
 
   <p id="chain-notice" class="hidden" role="status"></p>
@@ -1313,26 +1390,74 @@
     return Promise.resolve(MOCK_TXS);
   }
 
-  // Fetch sales for the connected wallet from the collective's public website
-  // API (replaces the dApp-store sales feed for the "Your sales" panel). In
-  // demo mode (no real wallet) returns obviously-fake staging rows so the
-  // panel renders. Any error / non-OK status resolves to [].
-  function fetchApiSales(addr) {
+  // Fetch the artist record for the connected wallet from the collective's
+  // public website API. Surfaces both the sales feed (for the "Your sales"
+  // panel) and the portrait (for the dashboard avatar). In demo mode (no real
+  // wallet) returns obviously-fake staging sales and no portrait (so the avatar
+  // falls back to initials). Any error / non-OK status resolves to empty values.
+  function fetchArtist(addr) {
     if (NATIVE) {
       return fetch('https://artists-collective.pages.dev/api/artist?addr=' + encodeURIComponent(addr))
         .then(function (res) {
-          if (!res.ok) return [];
+          if (!res.ok) return { sales: [], portrait: '' };
           return res.json().then(function (data) {
-            return Array.isArray(data && data.sales) ? data.sales : [];
+            return {
+              sales: Array.isArray(data && data.sales) ? data.sales : [],
+              portrait: (data && data.portrait) || '',
+            };
           });
         })
-        .catch(function () { return []; });
+        .catch(function () { return { sales: [], portrait: '' }; });
     }
-    return Promise.resolve([
-      { title: 'Staging demo — Reach',            buyer: 'Galerie Onze',          price: 2600 },
-      { title: 'Staging demo — Autumn Light #1',  buyer: 'staging-demo-buyer-a',  price: 450 },
-      { title: 'Staging demo — Quiet Tide #3',    buyer: 'staging-demo-buyer-c',  price: 620 },
-    ]);
+    return Promise.resolve({
+      sales: [
+        { title: 'Staging demo — Reach',            buyer: 'Galerie Onze',          price: 2600 },
+        { title: 'Staging demo — Autumn Light #1',  buyer: 'staging-demo-buyer-a',  price: 450 },
+        { title: 'Staging demo — Quiet Tide #3',    buyer: 'staging-demo-buyer-c',  price: 620 },
+      ],
+      portrait: '',
+    });
+  }
+
+  // ── Avatar rendering ───────────────────────────────────────────────────────
+  var WEBSITE_BASE = 'https://artists-collective.pages.dev/';
+
+  // Resolve a portrait value to a full URL: absolute http(s) and data: URLs are
+  // used as-is; a relative path (e.g. "u/…", "gen/…") is prefixed with the
+  // gallery website base.
+  function portraitUrl(portrait) {
+    if (!portrait) return '';
+    if (/^(https?:|data:)/i.test(portrait)) return portrait;
+    return WEBSITE_BASE + String(portrait).replace(/^\/+/, '');
+  }
+
+  // Initials fallback: leading characters of the connected address (the demo /
+  // staging address has no real name; this is a neutral placeholder). Strips a
+  // leading "ut1" wallet prefix so it isn't always "UT".
+  function avatarInitials(addr) {
+    if (!addr) return '·';
+    var s = String(addr).replace(/^ut1/i, '');
+    s = s.replace(/[^a-z0-9]/gi, '');
+    return (s.slice(0, 2) || '·').toUpperCase();
+  }
+
+  function renderAvatar(portrait) {
+    var el = document.getElementById('avatar');
+    var img = document.getElementById('avatar-img');
+    var initials = document.getElementById('avatar-initials');
+    if (!el || !img || !initials) return;
+
+    initials.textContent = avatarInitials(userAddr);
+
+    var url = portraitUrl(portrait);
+    if (!url) {
+      el.classList.remove('has-img');
+      img.removeAttribute('src');
+      return;
+    }
+    img.onload = function () { el.classList.add('has-img'); };
+    img.onerror = function () { el.classList.remove('has-img'); img.removeAttribute('src'); };
+    img.src = url;
   }
 
   function bridgeSend(dest, amount, memo) {
@@ -1478,7 +1603,7 @@
   }
 
   // ── Render: sales panel ───────────────────────────────────────────────────
-  // Renders sales from the collective's website API (fetchApiSales). Rows are
+  // Renders sales from the collective's website API (fetchArtist). Rows are
   // already scoped to the connected wallet, so no client-side filtering here.
   function renderSales(rows) {
     var el = document.getElementById('sales-list');
@@ -1614,15 +1739,16 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
-      fetchApiSales(userAddr),
+      fetchArtist(userAddr),
     ]).then(function (results) {
       dbSales = (results[0] && results[0].sales) || [];
       dbEnrolments = (results[1] && results[1].enrolments) || [];
       cachedLedger = parseTxs(results[2] || []);
-      var apiSales = results[3] || [];
+      var artist = results[3] || { sales: [], portrait: '' };
 
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(apiSales);
+      renderSales(artist.sales || []);
+      renderAvatar(artist.portrait);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
       renderLedger(cachedLedger);
@@ -1878,17 +2004,18 @@
       api('/api/sales'),
       api('/api/enrolments'),
       bridgeGetTxs(),
-      fetchApiSales(userAddr),
+      fetchArtist(userAddr),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
       dbEnrolments = (results[2] && results[2].enrolments) || [];
       cachedLedger = parseTxs(results[3] || []);
-      var apiSales = results[4] || [];
+      var artist = results[4] || { sales: [], portrait: '' };
 
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
-      renderSales(apiSales);
+      renderSales(artist.sales || []);
+      renderAvatar(artist.portrait);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
     }).catch(function (err) {
@@ -1915,6 +2042,9 @@
       userAddr = addr;
       document.getElementById('addr-pill').textContent = truncAddr(userAddr);
       document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
+      // Show the initials fallback immediately; the artist fetch in
+      // loadDashboard swaps in the real portrait once it resolves.
+      renderAvatar('');
 
       // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
       // just POST and let the DB decide if it's a new enrolment. A new enrolment
@@ -2109,6 +2239,92 @@
         webAccessBtn.disabled = false;
         webAccessBtn.textContent = 'Get desktop access code';
       });
+    });
+  }
+
+  // ── Change profile picture ─────────────────────────────────────────────────
+  // Reads the chosen image as base64 client-side, POSTs it to the dApp's own
+  // /api/avatar route (which forwards server-side to the gallery with the bearer
+  // key — never exposed here), then swaps the avatar to the returned portrait.
+  // No wallet/on-chain involvement. Any failure shows a friendly inline error.
+  var MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
+  var avatarChangeBtn = document.getElementById('avatar-change-btn');
+  var avatarFileInput = document.getElementById('avatar-file');
+
+  function showAvatarError(msg) {
+    var errEl = document.getElementById('avatar-error');
+    if (!errEl) return;
+    errEl.textContent = msg;
+    errEl.classList.remove('hidden');
+  }
+  function clearAvatarError() {
+    var errEl = document.getElementById('avatar-error');
+    if (!errEl) return;
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+  }
+
+  if (avatarChangeBtn && avatarFileInput) {
+    avatarChangeBtn.addEventListener('click', function () {
+      clearAvatarError();
+      avatarFileInput.click();
+    });
+
+    avatarFileInput.addEventListener('change', function () {
+      var file = avatarFileInput.files && avatarFileInput.files[0];
+      if (!file) return;
+      clearAvatarError();
+
+      if (file.size > MAX_AVATAR_BYTES) {
+        showAvatarError("That image is too large (5MB max). Try a smaller one.");
+        avatarFileInput.value = '';
+        return;
+      }
+
+      var avatarEl = document.getElementById('avatar');
+      avatarChangeBtn.disabled = true;
+      avatarChangeBtn.textContent = 'Updating…';
+      if (avatarEl) avatarEl.classList.add('loading');
+
+      function restore() {
+        avatarChangeBtn.disabled = false;
+        avatarChangeBtn.textContent = 'Change profile picture';
+        if (avatarEl) avatarEl.classList.remove('loading');
+        avatarFileInput.value = '';
+      }
+
+      var reader = new FileReader();
+      reader.onerror = function () {
+        restore();
+        showAvatarError("Couldn't update your picture, try again");
+      };
+      reader.onload = function () {
+        var result = String(reader.result || '');
+        var comma = result.indexOf(',');
+        var image_base64 = comma >= 0 ? result.slice(comma + 1) : '';
+        if (!image_base64) {
+          restore();
+          showAvatarError("Couldn't update your picture, try again");
+          return;
+        }
+        api('/api/avatar', {
+          method: 'POST',
+          body: JSON.stringify({
+            address: userAddr,
+            content_type: file.type,
+            image_base64: image_base64,
+          }),
+        }).then(function (data) {
+          if (!data || !data.portrait_url) throw new Error('missing portrait_url');
+          renderAvatar(data.portrait_url);
+          restore();
+        }).catch(function (err) {
+          console.warn('Avatar update error:', err);
+          restore();
+          showAvatarError("Couldn't update your picture, try again");
+        });
+      };
+      reader.readAsDataURL(file);
     });
   }
 
