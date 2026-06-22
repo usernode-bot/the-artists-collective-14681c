@@ -774,6 +774,120 @@
       border-top: 1px solid var(--line);
     }
 
+    /* ── Mobile bottom nav ── */
+    #mobile-bottom-nav {
+      position: fixed;
+      bottom: 1.25rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      display: none;
+    }
+
+    .mob-nav-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #FAF8F4;
+      border-radius: 9999px;
+      padding: 0.6rem 1.1rem;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .mob-nav-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.2rem;
+      min-width: 4.5rem;
+    }
+
+    .mob-nav-label {
+      font-family: 'Hanken Grotesk', system-ui, sans-serif;
+      font-size: 0.65rem;
+      letter-spacing: 0.07em;
+      color: #555047;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .mob-nav-arrow {
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+    }
+
+    .mob-nav-arrow-inner {
+      width: 2.1rem;
+      height: 2.1rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .mob-nav-item-left {
+      opacity: 0.38;
+      pointer-events: none;
+    }
+    .mob-nav-item-left.enabled {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .mob-nav-item-left .mob-nav-arrow-inner {
+      border: 1.5px dashed #555047;
+    }
+    .mob-nav-item-left .mob-nav-label { color: #888; }
+
+    .mob-nav-item-right .mob-nav-arrow-inner {
+      border: 2px solid #1d1b16;
+    }
+    .mob-nav-item-right.disabled {
+      opacity: 0.38;
+      pointer-events: none;
+    }
+
+    .mob-nav-menu-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.45rem 1.05rem;
+      border-radius: 9999px;
+      border: 1px solid #a78bca;
+      background: #FAF8F4;
+      font-family: 'Hanken Grotesk', system-ui, sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: #1d1b16;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: background 0.15s;
+      text-decoration: none;
+    }
+    .mob-nav-menu-btn:hover { background: #f0ece4; }
+
+    .mob-nav-divider {
+      width: 1px;
+      height: 1.75rem;
+      background: #d8d2c6;
+      margin: 0 0.1rem;
+      flex-shrink: 0;
+    }
+
+    /* show nav when studio is active */
+    body.studio-active #mobile-bottom-nav { display: flex; justify-content: center; }
+
+    /* push content up so nav doesn't overlap */
+    body.studio-active .view { padding-bottom: 5.5rem; }
+
     /* ── Responsive ── */
     @media (max-width: 680px) {
       .panels { grid-template-columns: 1fr; }
@@ -783,6 +897,9 @@
       .treasury-total { font-size: 2rem; }
       .ledger-table th:nth-child(4),
       .ledger-table td:nth-child(4) { display: none; }
+    }
+    @media (max-width: 680px) {
+      body.studio-active .view { padding-bottom: 6rem; }
     }
 
     @media (max-width: 640px) {
@@ -947,6 +1064,49 @@
     <div id="forum-thread-detail"></div>
   </div>
 </div>
+
+<!-- Mobile bottom navigation -->
+<nav id="mobile-bottom-nav" aria-label="Page navigation">
+  <div class="mob-nav-pill">
+    <!-- Left: Prev Page -->
+    <div class="mob-nav-item mob-nav-item-left" id="mob-nav-prev">
+      <button class="mob-nav-arrow" id="mob-nav-prev-btn" aria-label="Previous page" tabindex="-1">
+        <div class="mob-nav-arrow-inner">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.5 3L4.5 7L8.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </button>
+      <span class="mob-nav-label">Prev Page</span>
+    </div>
+
+    <div class="mob-nav-divider"></div>
+
+    <!-- Center: Menu -->
+    <div class="mob-nav-item">
+      <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+        </svg>
+        Menu
+      </a>
+    </div>
+
+    <div class="mob-nav-divider"></div>
+
+    <!-- Right: Next Page -->
+    <div class="mob-nav-item mob-nav-item-right" id="mob-nav-next">
+      <button class="mob-nav-arrow" id="mob-nav-next-btn" aria-label="Next page">
+        <div class="mob-nav-arrow-inner">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5.5 3L9.5 7L5.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </button>
+      <span class="mob-nav-label">Next Page</span>
+    </div>
+  </div>
+</nav>
 
 <script>
 (function () {
@@ -1683,7 +1843,9 @@
       }
 
       document.getElementById('site-header').classList.remove('hidden');
+      document.body.classList.add('studio-active');
       showView('view-dash');
+      updateMobNav(0);
       return loadDashboard();
     }).catch(function (err) {
       console.error('Entry error:', err);
@@ -1736,6 +1898,62 @@
       errEl.classList.remove('hidden');
     });
   });
+
+  // ── Mobile bottom nav ─────────────────────────────────────────────────────
+  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum'];
+  var navCurrentIdx = 0;
+
+  function updateMobNav(idx) {
+    navCurrentIdx = idx;
+    var prevEl = document.getElementById('mob-nav-prev');
+    var nextEl = document.getElementById('mob-nav-next');
+    var prevBtn = document.getElementById('mob-nav-prev-btn');
+    var nextBtn = document.getElementById('mob-nav-next-btn');
+
+    if (idx <= 0) {
+      prevEl.classList.remove('enabled');
+      prevBtn.tabIndex = -1;
+    } else {
+      prevEl.classList.add('enabled');
+      prevBtn.tabIndex = 0;
+    }
+
+    if (idx >= NAV_PAGES.length - 1) {
+      nextEl.classList.add('disabled');
+      nextBtn.tabIndex = -1;
+    } else {
+      nextEl.classList.remove('disabled');
+      nextBtn.tabIndex = 0;
+    }
+  }
+
+  document.getElementById('mob-nav-prev-btn').addEventListener('click', function () {
+    if (navCurrentIdx <= 0) return;
+    var newIdx = navCurrentIdx - 1;
+    var viewId = NAV_PAGES[newIdx];
+    showView(viewId);
+    updateMobNav(newIdx);
+    if (viewId === 'view-ledger') renderLedger(cachedLedger);
+    if (viewId === 'view-forum') { showForumList(); loadThreads(); }
+  });
+
+  document.getElementById('mob-nav-next-btn').addEventListener('click', function () {
+    if (navCurrentIdx >= NAV_PAGES.length - 1) return;
+    var newIdx = navCurrentIdx + 1;
+    var viewId = NAV_PAGES[newIdx];
+    showView(viewId);
+    updateMobNav(newIdx);
+    if (viewId === 'view-ledger') renderLedger(cachedLedger);
+    if (viewId === 'view-forum') { showForumList(); loadThreads(); }
+  });
+
+  // Keep the mobile nav in sync when header tabs are clicked
+  var _origShowView = showView;
+  showView = function (viewId) {
+    _origShowView(viewId);
+    var idx = NAV_PAGES.indexOf(viewId);
+    if (idx !== -1) updateMobNav(idx);
+  };
 
   // ── Init ───────────────────────────────────────────────────────────────────
   // NATIVE is detected lazily in bridgeGetAddress() — reading isNative here
