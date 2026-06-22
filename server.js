@@ -255,6 +255,19 @@ app.get('/api/enrolments', async (_req, res) => {
   }
 });
 
+app.get('/api/enrolments/me', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT id, addr, tx_hash FROM enrolments WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (rows.length) return res.json({ enrolled: true, enrolment: rows[0] });
+    res.json({ enrolled: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/enrolments', async (req, res) => {
   const { addr } = req.body || {};
   if (!addr || !String(addr).trim()) {

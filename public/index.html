@@ -2174,6 +2174,52 @@
   // hasn't completed yet. The mode notice is updated in the enter-btn handler.
   applyTheme();
 
+  // Auto-enter enrolled users: if a token is present, check whether the
+  // current user already has an enrolment record and skip the gate if so.
+  if (TOKEN) {
+    var autoEnrolBtn = document.getElementById('enrol-btn');
+    var autoEnterBtn = document.getElementById('enter-btn');
+    autoEnrolBtn.disabled = true;
+    autoEnterBtn.disabled = true;
+    autoEnrolBtn.textContent = 'Checking…';
+    autoEnterBtn.textContent = 'Checking…';
+
+    api('/api/enrolments/me').then(function (data) {
+      if (data && data.enrolled) {
+        return bridgeGetAddress().then(function (addr) {
+          userAddr = addr;
+          document.getElementById('addr-pill').textContent = truncAddr(userAddr);
+          document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
+          document.getElementById('site-header').classList.remove('hidden');
+          document.body.classList.add('studio-active');
+          showView('view-dash');
+          updateMobNav(0);
+          return loadDashboard();
+        }).catch(function (err) {
+          console.error('Auto-entry bridge error:', err);
+          autoEnrolBtn.disabled = false;
+          autoEnterBtn.disabled = false;
+          autoEnrolBtn.textContent = 'Create your artist account →';
+          autoEnterBtn.textContent = 'Enter the studio →';
+          var errEl = document.getElementById('enter-error');
+          errEl.textContent = 'Could not connect to your wallet. Please try again.';
+          errEl.classList.remove('hidden');
+        });
+      }
+      // Not enrolled — restore gate to normal state.
+      autoEnrolBtn.disabled = false;
+      autoEnterBtn.disabled = false;
+      autoEnrolBtn.textContent = 'Create your artist account →';
+      autoEnterBtn.textContent = 'Enter the studio →';
+    }).catch(function () {
+      // Network or server error — fall back to showing the gate normally.
+      autoEnrolBtn.disabled = false;
+      autoEnterBtn.disabled = false;
+      autoEnrolBtn.textContent = 'Create your artist account →';
+      autoEnterBtn.textContent = 'Enter the studio →';
+    });
+  }
+
   // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
   // screenshots and proposal checks land on a populated dashboard (which
   // renders from the seeded DB) instead of the gate. No-op without the flag.
