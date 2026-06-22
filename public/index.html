@@ -515,6 +515,83 @@
     #sale-form button:hover:not(:disabled) { opacity: 0.82; }
     #sale-form button:disabled { opacity: 0.45; cursor: default; }
 
+    /* ── Desktop access ── */
+    .web-access-intro {
+      font-size: 0.84rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 1rem;
+    }
+    #web-access-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #web-access-btn:hover:not(:disabled) { opacity: 0.82; }
+    #web-access-btn:disabled { opacity: 0.45; cursor: default; }
+
+    #web-access-result {
+      margin-top: 1rem;
+      padding: 0.9rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--paper);
+    }
+    .web-access-line {
+      font-size: 0.84rem;
+      color: var(--ink-2);
+      line-height: 1.55;
+      margin-bottom: 0.5rem;
+      word-break: break-word;
+    }
+    .web-access-line a { color: var(--accent); }
+    .web-access-code {
+      font-family: 'Courier New', monospace;
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--ink);
+      user-select: all;
+    }
+    .web-access-user { color: var(--ink); font-weight: 600; }
+    .web-access-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin: 0.7rem 0 0.6rem;
+    }
+    .web-access-copy {
+      background: transparent;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .web-access-copy:hover { opacity: 0.78; }
+    .web-access-note {
+      font-size: 0.76rem;
+      color: var(--ink-2);
+      font-style: italic;
+      margin: 0;
+    }
+    #web-access-error {
+      margin-top: 0.85rem;
+      font-size: 0.84rem;
+      color: var(--accent);
+    }
+
     /* ── Treasury ── */
     .treasury-total {
       font-family: var(--serif);
@@ -1012,6 +1089,13 @@
       <div class="card">
         <h2>Ownership</h2>
         <div id="ownership-bars"></div>
+      </div>
+      <div class="card">
+        <h2>Desktop access</h2>
+        <p class="web-access-intro">Sign in to manage your gallery from a computer.</p>
+        <button id="web-access-btn" type="button">Get desktop access code</button>
+        <div id="web-access-result" class="hidden"></div>
+        <p id="web-access-error" class="hidden"></p>
       </div>
     </div>
   </div>
@@ -1898,6 +1982,92 @@
       errEl.classList.remove('hidden');
     });
   });
+
+  // ── Desktop access code ────────────────────────────────────────────────────
+  // Calls the app's own backend (server-side bearer call to the gallery site);
+  // the wallet/node is never used in the browser. The returned code is
+  // one-time-display — re-tapping replaces any previous code on the website.
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise(function (resolve, reject) {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'absolute';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        resolve();
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function bindCopyButton(btnEl, value, label) {
+    btnEl.addEventListener('click', function () {
+      copyToClipboard(value).then(function () {
+        var prev = label;
+        btnEl.textContent = 'Copied ✓';
+        setTimeout(function () { btnEl.textContent = prev; }, 1500);
+      }).catch(function () {
+        btnEl.textContent = 'Copy failed';
+        setTimeout(function () { btnEl.textContent = label; }, 1500);
+      });
+    });
+  }
+
+  var webAccessBtn = document.getElementById('web-access-btn');
+  if (webAccessBtn) {
+    webAccessBtn.addEventListener('click', function () {
+      var resultEl = document.getElementById('web-access-result');
+      var errEl = document.getElementById('web-access-error');
+      errEl.classList.add('hidden');
+      errEl.textContent = '';
+      resultEl.classList.add('hidden');
+      resultEl.innerHTML = '';
+      webAccessBtn.disabled = true;
+      webAccessBtn.textContent = 'Getting code…';
+
+      api('/api/web-access-code', {
+        method: 'POST',
+        body: JSON.stringify({ address: userAddr }),
+      }).then(function (data) {
+        var loginUrl = data.login_url || 'https://artists-collective.pages.dev/login';
+        var uname = data.username || '';
+        var code = data.code || '';
+
+        resultEl.innerHTML =
+          '<p class="web-access-line">Sign in on a computer at ' +
+            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener">' + esc(loginUrl) + '</a></p>' +
+          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span>' +
+            '   Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
+          '<div class="web-access-actions">' +
+            '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
+            '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' +
+          '</div>' +
+          '<p class="web-access-note">This replaces any code you generated before.</p>';
+
+        bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
+        bindCopyButton(document.getElementById('web-access-copy-link'), loginUrl, 'Copy link');
+
+        resultEl.classList.remove('hidden');
+        webAccessBtn.disabled = false;
+        webAccessBtn.textContent = 'Get desktop access code';
+      }).catch(function (err) {
+        console.error('Web access code error:', err);
+        resultEl.classList.add('hidden');
+        resultEl.innerHTML = '';
+        errEl.textContent = "Couldn't get a code right now. Please try again.";
+        errEl.classList.remove('hidden');
+        webAccessBtn.disabled = false;
+        webAccessBtn.textContent = 'Get desktop access code';
+      });
+    });
+  }
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
   var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum'];

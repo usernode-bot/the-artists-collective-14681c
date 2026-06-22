@@ -91,6 +91,76 @@ app.get('/api/me', (req, res) => {
   res.json({ id: req.user.id, username: req.user.username, usernode_pubkey: req.user.usernode_pubkey || null });
 });
 
+// ── Desktop access code ───────────────────────────────────────────────────────
+// Mints a short sign-in code for the gallery website (artists-collective.pages.dev)
+// so an artist can manage their gallery from a computer. No on-chain transaction:
+// this is a plain authenticated HTTPS call made SERVER-SIDE so the bearer key
+// (WEB_ACCESS_KEY) never reaches the browser. Auth is guaranteed by the
+// deny-by-default middleware above (this path is NOT in PUBLIC_API_PATHS), so
+// req.user is always present here. Identity (username, address) is taken from the
+// verified JWT; the client-supplied address is only a demo-mode fallback.
+const WEB_ACCESS_URL = 'https://artists-collective.pages.dev/api/web-access';
+const WEB_ACCESS_LOGIN_URL = 'https://artists-collective.pages.dev/login';
+
+app.post('/api/web-access-code', async (req, res) => {
+  const username = req.user.username;
+  // Trust the verified pubkey first; fall back to the client-sent address only
+  // for demo sessions where the wallet isn't linked (usernode_pubkey is null).
+  const address = req.user.usernode_pubkey || (req.body && req.body.address) || '';
+  if (!address) {
+    return res.status(400).json({ error: 'No artist address available' });
+  }
+
+  // Staging: the prod WEB_ACCESS_KEY is private (excluded from staging), so skip
+  // the external call entirely and return an obviously-fake code so the flow is
+  // testable end-to-end. Strict no-op in production.
+  if (IS_STAGING) {
+    console.log('[web-access-code] staging stub for', username);
+    return res.json({ ok: true, code: '024680', username, login_url: WEB_ACCESS_LOGIN_URL });
+  }
+
+  const key = process.env.WEB_ACCESS_KEY;
+  if (!key) {
+    console.warn('[web-access-code] WEB_ACCESS_KEY is not set — cannot mint a code');
+    return res.status(502).json({ error: 'Desktop access is not configured yet' });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const upstream = await fetch(WEB_ACCESS_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ address, username }),
+      signal: controller.signal,
+    });
+    if (!upstream.ok) {
+      console.warn('[web-access-code] upstream responded', upstream.status);
+      return res.status(502).json({ error: "Couldn't get a code right now, try again" });
+    }
+    const data = await upstream.json();
+    if (!data || !data.code) {
+      console.warn('[web-access-code] upstream response missing code');
+      return res.status(502).json({ error: "Couldn't get a code right now, try again" });
+    }
+    // Pass the upstream JSON through. The code is one-time-display — never stored.
+    return res.json({
+      ok: true,
+      code: data.code,
+      username: data.username || username,
+      login_url: data.login_url || WEB_ACCESS_LOGIN_URL,
+    });
+  } catch (err) {
+    console.warn('[web-access-code] request failed:', err.message);
+    return res.status(502).json({ error: "Couldn't get a code right now, try again" });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 app.get('/api/proposals', async (req, res) => {
   try {
     const { rows } = await pool.query(`
