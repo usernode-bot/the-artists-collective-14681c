@@ -1011,6 +1011,7 @@
     <button id="tab-dash" class="tab active">Dashboard</button>
     <button id="tab-ledger" class="tab">Ledger</button>
     <button id="tab-forum" class="tab">Forum</button>
+    <button id="tab-web" class="tab">Desktop access</button>
   </nav>
   <div class="header-right">
     <button id="theme-toggle" aria-label="Toggle theme">☾</button>
@@ -1090,13 +1091,6 @@
         <h2>Ownership</h2>
         <div id="ownership-bars"></div>
       </div>
-      <div class="card">
-        <h2>Desktop access</h2>
-        <p class="web-access-intro">Sign in to manage your gallery from a computer.</p>
-        <button id="web-access-btn" type="button">Get desktop access code</button>
-        <div id="web-access-result" class="hidden"></div>
-        <p id="web-access-error" class="hidden"></p>
-      </div>
     </div>
   </div>
 </div>
@@ -1146,6 +1140,21 @@
   <div id="forum-thread-view" class="hidden">
     <button id="forum-back" class="forum-back">← Back to forum</button>
     <div id="forum-thread-detail"></div>
+  </div>
+</div>
+
+<!-- View: Desktop access -->
+<div id="view-web" class="view hidden">
+  <div class="dash-header">
+    <h1>Desktop access</h1>
+    <p class="subtitle">Manage your gallery on the website from a computer.</p>
+  </div>
+  <div class="card">
+    <h2>Get a sign-in code</h2>
+    <p class="web-access-intro">Sign in to manage your gallery from a computer.</p>
+    <button id="web-access-btn" type="button">Get desktop access code</button>
+    <div id="web-access-result" class="hidden"></div>
+    <p id="web-access-error" class="hidden"></p>
   </div>
 </div>
 
@@ -1826,7 +1835,7 @@
 
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-dash', 'view-ledger', 'view-forum'].forEach(function (id) {
+    ['view-gate', 'view-dash', 'view-ledger', 'view-forum', 'view-web'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -1839,6 +1848,7 @@
     document.getElementById('tab-dash').classList.toggle('active', viewId === 'view-dash');
     document.getElementById('tab-ledger').classList.toggle('active', viewId === 'view-ledger');
     document.getElementById('tab-forum').classList.toggle('active', viewId === 'view-forum');
+    document.getElementById('tab-web').classList.toggle('active', viewId === 'view-web');
   }
 
   // ── Tab listeners ──────────────────────────────────────────────────────────
@@ -1855,6 +1865,10 @@
     showView('view-forum');
     showForumList();
     loadThreads();
+  });
+
+  document.getElementById('tab-web').addEventListener('click', function () {
+    showView('view-web');
   });
 
   // ── Dashboard load ─────────────────────────────────────────────────────────
@@ -2072,8 +2086,8 @@
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
             '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
-          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span>' +
-            '   Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
+          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
+          '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
             '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' +
@@ -2099,7 +2113,7 @@
   }
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
-  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum'];
+  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-web'];
   var navCurrentIdx = 0;
 
   function updateMobNav(idx) {
