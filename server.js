@@ -161,6 +161,87 @@ app.post('/api/web-access-code', async (req, res) => {
   }
 });
 
+// ── Profile picture (avatar) ────────────────────────────────────────────────
+// Forwards an artist's new portrait to the gallery website server-side, so the
+// bearer key (WEB_ACCESS_KEY — the same private platform secret used by the
+// desktop-access route) never reaches the browser. No on-chain transaction:
+// this is a plain authenticated HTTPS call. Auth is guaranteed by the
+// deny-by-default middleware above (this path is NOT in PUBLIC_API_PATHS), so
+// req.user is always present. The address is taken from the verified pubkey
+// first, with the client-supplied address as a demo-mode fallback (mirrors the
+// web-access-code handler).
+const AVATAR_URL = 'https://artists-collective.pages.dev/api/avatar';
+const ALLOWED_AVATAR_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+// Backstop cap on the base64 payload (~7MB of base64 ≈ ~5MB binary). The client
+// guards before upload; this protects the route from oversized bodies.
+const MAX_AVATAR_BASE64_LEN = 7 * 1024 * 1024;
+
+app.post('/api/avatar', async (req, res) => {
+  const body = req.body || {};
+  const content_type = String(body.content_type || '');
+  const image_base64 = typeof body.image_base64 === 'string' ? body.image_base64 : '';
+  // Trust the verified pubkey first; fall back to the client-sent address only
+  // for demo sessions where the wallet isn't linked (usernode_pubkey is null).
+  const address = req.user.usernode_pubkey || body.address || '';
+
+  if (!address) {
+    return res.status(400).json({ error: 'No artist address available' });
+  }
+  if (!ALLOWED_AVATAR_TYPES.has(content_type)) {
+    return res.status(400).json({ error: 'Unsupported image type' });
+  }
+  if (!image_base64) {
+    return res.status(400).json({ error: 'No image data provided' });
+  }
+  if (image_base64.length > MAX_AVATAR_BASE64_LEN) {
+    return res.status(400).json({ error: 'Image is too large' });
+  }
+
+  // Staging: the prod WEB_ACCESS_KEY is private (excluded from staging), so skip
+  // the external call entirely and echo the uploaded image back as a data: URL
+  // so the upload flow is testable end-to-end. Strict no-op in production.
+  if (IS_STAGING) {
+    console.log('[avatar] staging stub for', req.user.username);
+    const dataUrl = 'data:' + content_type + ';base64,' + image_base64;
+    return res.json({ ok: true, portrait: '', portrait_url: dataUrl });
+  }
+
+  const key = process.env.WEB_ACCESS_KEY;
+  if (!key) {
+    console.warn('[avatar] WEB_ACCESS_KEY is not set — cannot update portrait');
+    return res.status(502).json({ error: "Couldn't update your picture, try again" });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+  try {
+    const upstream = await fetch(AVATAR_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + key,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ address, content_type, image_base64 }),
+      signal: controller.signal,
+    });
+    if (!upstream.ok) {
+      console.warn('[avatar] upstream responded', upstream.status);
+      return res.status(502).json({ error: "Couldn't update your picture, try again" });
+    }
+    const data = await upstream.json();
+    if (!data || !data.portrait_url) {
+      console.warn('[avatar] upstream response missing portrait_url');
+      return res.status(502).json({ error: "Couldn't update your picture, try again" });
+    }
+    return res.json({ ok: true, portrait: data.portrait || '', portrait_url: data.portrait_url });
+  } catch (err) {
+    console.warn('[avatar] request failed:', err.message);
+    return res.status(502).json({ error: "Couldn't update your picture, try again" });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 app.get('/api/proposals', async (req, res) => {
   try {
     const { rows } = await pool.query(`
