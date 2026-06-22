@@ -856,7 +856,7 @@
     }
 
     .mob-nav-menu-btn {
-      display: flex;
+      display: inline-flex;
       align-items: center;
       gap: 0.35rem;
       padding: 0.45rem 1.05rem;
@@ -870,6 +870,7 @@
       cursor: pointer;
       letter-spacing: 0.03em;
       transition: background 0.15s;
+      text-decoration: none;
     }
     .mob-nav-menu-btn:hover { background: #f0ece4; }
 
@@ -1083,12 +1084,12 @@
 
     <!-- Center: Menu -->
     <div class="mob-nav-item">
-      <button class="mob-nav-menu-btn" id="mob-nav-menu-btn" aria-label="Menu — return to app home">
+      <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_top" aria-label="Menu — return to app home">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         </svg>
         Menu
-      </button>
+      </a>
     </div>
 
     <div class="mob-nav-divider"></div>
@@ -1944,11 +1945,6 @@
     updateMobNav(newIdx);
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
-  });
-
-  document.getElementById('mob-nav-menu-btn').addEventListener('click', function () {
-    updateMobNav(0);
-    window.top.location.href = 'https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/';
   });
 
   // Keep the mobile nav in sync when header tabs are clicked
