@@ -29,6 +29,8 @@
     { "name": "Studio gate renders", "path": "/", "expectSelector": "#view-gate" },
     { "name": "Studio dashboard renders", "path": "/?demo=1", "expectSelector": "#view-dash" },
     { "name": "Forum tab renders", "path": "/?demo=1", "expectSelector": "#tab-forum" },
-    { "name": "Desktop access button renders", "path": "/?demo=1", "expectSelector": "#web-access-btn" }
+    { "name": "Desktop access button renders", "path": "/?demo=1", "expectSelector": "#web-access-btn" },
+    { "name": "Profile avatar renders", "path": "/?demo=1", "expectSelector": "#avatar" },
+    { "name": "Change profile picture button renders", "path": "/?demo=1", "expectSelector": "#avatar-change-btn" }
   ]
 }
