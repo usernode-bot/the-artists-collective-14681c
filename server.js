@@ -339,11 +339,23 @@ app.get('/api/enrolments', async (_req, res) => {
 app.get('/api/enrolments/me', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, addr, tx_hash FROM enrolments WHERE user_id = $1',
+      'SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE user_id = $1',
       [req.user.id]
     );
     if (rows.length) return res.json({ enrolled: true, enrolment: rows[0] });
     res.json({ enrolled: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/enrolments/me/welcome-seen', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE enrolments SET has_seen_welcome = TRUE WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -356,7 +368,7 @@ app.post('/api/enrolments', async (req, res) => {
   }
   try {
     // The addr UNIQUE constraint is the dedupe — no need to read the chain.
-    const existing = await pool.query(`SELECT id, addr, tx_hash FROM enrolments WHERE addr = $1`, [addr]);
+    const existing = await pool.query(`SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE addr = $1`, [addr]);
     if (existing.rows.length) {
       return res.json({ enrolment: existing.rows[0], enrolled: false });
     }
@@ -364,12 +376,12 @@ app.post('/api/enrolments', async (req, res) => {
       INSERT INTO enrolments (user_id, username, addr)
       VALUES ($1, $2, $3)
       ON CONFLICT (addr) DO NOTHING
-      RETURNING id, addr, tx_hash
+      RETURNING id, addr, tx_hash, has_seen_welcome
     `, [req.user.id, req.user.username, addr]);
     if (rows.length) {
       return res.json({ enrolment: rows[0], enrolled: true });
     }
-    const again = await pool.query(`SELECT id, addr, tx_hash FROM enrolments WHERE addr = $1`, [addr]);
+    const again = await pool.query(`SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE addr = $1`, [addr]);
     res.json({ enrolment: again.rows[0], enrolled: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -669,6 +681,11 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // has_seen_welcome: tracks whether the artist has seen the one-time welcome
+  // panel shown after their first enrolment. Backfill TRUE for all existing
+  // rows so pre-deploy members are not shown a retroactive welcome panel.
+  await pool.query(`ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS has_seen_welcome BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`UPDATE enrolments SET has_seen_welcome = TRUE WHERE has_seen_welcome = FALSE`);
 
   // Forum: discussion board for the collective. Public — every member reads
   // the board in-app (no auth/financial/personal data), so NO 'staging:private'
