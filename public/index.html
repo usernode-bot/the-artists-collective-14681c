@@ -529,6 +529,44 @@
     }
 
     /* ── Governance ── */
+    .fee-status {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--paper-2);
+      font-size: 0.9rem;
+    }
+    .fee-status-label { color: var(--ink-2); }
+    .fee-status-value {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--ink);
+    }
+    .proposal-outcome {
+      margin-left: auto;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.22rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--ink-2);
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .proposal-outcome.is-passed {
+      color: var(--ok);
+      border-color: var(--ok);
+      background: color-mix(in srgb, var(--ok) 12%, transparent);
+    }
+    .proposal-outcome.is-failed {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
     .proposal-title {
       font-family: var(--serif);
       font-size: 1.05rem;
@@ -1471,6 +1509,13 @@
     <div class="panel-col">
       <div class="card">
         <h2>Governance</h2>
+        <!-- Fee Split status — static so the badge is always in the DOM (and at
+             /?demo=1) regardless of data load. JS updates it via renderFeeStatus. -->
+        <div class="fee-status">
+          <span class="fee-status-label">Platform fee:</span>
+          <span class="fee-status-value" id="platform-fee-value">20%</span>
+          <span class="proposal-outcome" id="proposal-outcome">Voting open</span>
+        </div>
         <div id="proposals-list"><p class="proposal-desc">Loading…</p></div>
       </div>
       <div class="card">
@@ -1659,7 +1704,11 @@
   var cachedLedger = [];
   var dbSales = [];
   var dbEnrolments = [];
-  var GALLERY_FEE_RATE = 0.10;
+  // The platform fee is governed by the Fee Split proposal (see renderFeeStatus).
+  // Initialised to the default fee and overwritten with the live value from
+  // /api/platform once the dashboard loads, so newly recorded sales use the
+  // governed rate. 0.20 = the 20% default before any vote passes.
+  var GALLERY_FEE_RATE = 0.20;
   var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
 
   // ── Chain-write notice ───────────────────────────────────────────────────────
@@ -1919,6 +1968,33 @@
     document.getElementById('stat-sales-value').textContent = '$' + stats.salesValue.toLocaleString();
   }
 
+  // ── Render: platform fee status ───────────────────────────────────────────
+  // Updates the always-present Fee Split badge + displayed fee from /api/platform.
+  // The badge element is static in the HTML (default "Voting open") so the
+  // .proposal-outcome selector exists even if this never runs / the fetch fails.
+  // Also syncs GALLERY_FEE_RATE so recorded sales use the governed fee.
+  function renderFeeStatus(platform) {
+    if (!platform) return;
+    var feePercent = Number(platform.feePercent);
+    if (!isNaN(feePercent)) {
+      GALLERY_FEE_RATE = feePercent / 100;
+      var valueEl = document.getElementById('platform-fee-value');
+      if (valueEl) valueEl.textContent = feePercent + '%';
+    }
+    var badge = document.getElementById('proposal-outcome');
+    if (!badge) return;
+    badge.classList.remove('is-passed', 'is-failed');
+    if (platform.status === 'passed') {
+      badge.textContent = 'Passed — fee updated to ' + feePercent + '%';
+      badge.classList.add('is-passed');
+    } else if (platform.status === 'failed') {
+      badge.textContent = 'Not passed — fee stays ' + feePercent + '%';
+      badge.classList.add('is-failed');
+    } else {
+      badge.textContent = 'Voting open';
+    }
+  }
+
   // ── Render: proposals ─────────────────────────────────────────────────────
   function renderProposals(proposals) {
     var el = document.getElementById('proposals-list');
@@ -2076,9 +2152,10 @@
       return bridgeSend(userAddr, 1, memo);
     }).then(function (result) {
       if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
-      return api('/api/proposals');
-    }).then(function (data) {
-      renderProposals(data.proposals);
+      return Promise.all([api('/api/proposals'), api('/api/platform')]);
+    }).then(function (results) {
+      renderProposals(results[0].proposals);
+      renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
     }).catch(function (err) {
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
@@ -2611,6 +2688,7 @@
       bridgeGetTxs(),
       fetchArtist(userAddr),
       api('/api/me'),
+      api('/api/platform'),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
@@ -2620,6 +2698,7 @@
       var me = results[5] || {};
       currentUserId = me.id || 0;
 
+      renderFeeStatus(results[6]);
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
       renderSales(artist.sales || []);
