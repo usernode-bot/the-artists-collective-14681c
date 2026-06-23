@@ -274,6 +274,63 @@ app.post('/api/avatar', async (req, res) => {
   }
 });
 
+// ── Platform fee governance ──────────────────────────────────────────────────
+// The displayed/applied platform fee is governed by a single Fee Split proposal.
+// platform_settings (id=1) holds the current fee, the value the proposal would
+// set, which proposal governs it, and a sticky outcome status. No blockchain:
+// the outcome is decided from the DB vote tally and persisted, so it survives
+// reloads and redeploys.
+const FEE_QUORUM = 4; // minimum total votes before the outcome is decided
+
+// Recompute the fee outcome from the live vote tally. Only acts while status is
+// still 'open'; once 'passed'/'failed' it early-returns, making the result
+// persistent. On a pass, the proposed fee becomes the current fee.
+async function evaluateFeeOutcome() {
+  const settingsRes = await pool.query(
+    `SELECT fee_proposal_id, proposed_fee, status FROM platform_settings WHERE id = 1`
+  );
+  if (!settingsRes.rows.length) return;
+  const s = settingsRes.rows[0];
+  if (s.status !== 'open' || !s.fee_proposal_id) return;
+
+  const tallyRes = await pool.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
+       COALESCE(SUM(CASE WHEN direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count
+     FROM votes WHERE proposal_id = $1`,
+    [s.fee_proposal_id]
+  );
+  const forCount = tallyRes.rows[0].for_count;
+  const againstCount = tallyRes.rows[0].against_count;
+  const total = forCount + againstCount;
+  if (total < FEE_QUORUM) return; // not enough participation yet — stays open
+
+  if (forCount > againstCount) {
+    await pool.query(
+      `UPDATE platform_settings SET status = 'passed', fee_percent = proposed_fee WHERE id = 1`
+    );
+  } else {
+    await pool.query(`UPDATE platform_settings SET status = 'failed' WHERE id = 1`);
+  }
+}
+
+app.get('/api/platform', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT fee_percent, proposed_fee, fee_proposal_id, status FROM platform_settings WHERE id = 1`
+    );
+    const s = rows[0] || { fee_percent: 20, proposed_fee: 15, fee_proposal_id: null, status: 'open' };
+    res.json({
+      feePercent: s.fee_percent,
+      proposedFee: s.proposed_fee,
+      feeProposalId: s.fee_proposal_id,
+      status: s.status,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/proposals', async (req, res) => {
   try {
     const { rows } = await pool.query(`
@@ -305,7 +362,12 @@ app.post('/api/votes', async (req, res) => {
       ON CONFLICT (proposal_id, user_id)
       DO UPDATE SET direction = EXCLUDED.direction, created_at = NOW()
     `, [proposal_id, req.user.id, req.user.username, direction]);
-    await syncFeePct();
+    // If this was a vote on the Fee Split proposal, re-evaluate whether the
+    // governed fee should now flip (sticky once decided).
+    const feeRes = await pool.query(`SELECT fee_proposal_id FROM platform_settings WHERE id = 1`);
+    if (feeRes.rows.length && feeRes.rows[0].fee_proposal_id === Number(proposal_id)) {
+      await evaluateFeeOutcome();
+    }
     res.json({ ok: true, direction });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -382,11 +444,23 @@ app.get('/api/enrolments', async (_req, res) => {
 app.get('/api/enrolments/me', async (req, res) => {
   try {
     const { rows } = await pool.query(
-      'SELECT id, addr, tx_hash FROM enrolments WHERE user_id = $1',
+      'SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE user_id = $1',
       [req.user.id]
     );
     if (rows.length) return res.json({ enrolled: true, enrolment: rows[0] });
     res.json({ enrolled: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/enrolments/me/welcome-seen', async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE enrolments SET has_seen_welcome = TRUE WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -399,7 +473,7 @@ app.post('/api/enrolments', async (req, res) => {
   }
   try {
     // The addr UNIQUE constraint is the dedupe — no need to read the chain.
-    const existing = await pool.query(`SELECT id, addr, tx_hash FROM enrolments WHERE addr = $1`, [addr]);
+    const existing = await pool.query(`SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE addr = $1`, [addr]);
     if (existing.rows.length) {
       return res.json({ enrolment: existing.rows[0], enrolled: false });
     }
@@ -407,12 +481,12 @@ app.post('/api/enrolments', async (req, res) => {
       INSERT INTO enrolments (user_id, username, addr)
       VALUES ($1, $2, $3)
       ON CONFLICT (addr) DO NOTHING
-      RETURNING id, addr, tx_hash
+      RETURNING id, addr, tx_hash, has_seen_welcome
     `, [req.user.id, req.user.username, addr]);
     if (rows.length) {
       return res.json({ enrolment: rows[0], enrolled: true });
     }
-    const again = await pool.query(`SELECT id, addr, tx_hash FROM enrolments WHERE addr = $1`, [addr]);
+    const again = await pool.query(`SELECT id, addr, tx_hash, has_seen_welcome FROM enrolments WHERE addr = $1`, [addr]);
     res.json({ enrolment: again.rows[0], enrolled: false });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -727,6 +801,11 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // has_seen_welcome: tracks whether the artist has seen the one-time welcome
+  // panel shown after their first enrolment. Backfill TRUE for all existing
+  // rows so pre-deploy members are not shown a retroactive welcome panel.
+  await pool.query(`ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS has_seen_welcome BOOLEAN NOT NULL DEFAULT FALSE`);
+  await pool.query(`UPDATE enrolments SET has_seen_welcome = TRUE WHERE has_seen_welcome = FALSE`);
 
   // Forum: discussion board for the collective. Public — every member reads
   // the board in-app (no auth/financial/personal data), so NO 'staging:private'
@@ -785,27 +864,56 @@ async function start() {
   `);
   await pool.query(`COMMENT ON TABLE direct_messages IS 'staging:private'`);
 
+  // Platform settings: single-row table (id always 1) governing the displayed /
+  // applied platform fee via the Fee Split proposal. Public — product config, no
+  // per-user/financial/personal data, no FK to a private table. fee_percent is
+  // the current fee, proposed_fee is what a passing Fee Split vote sets it to,
+  // fee_proposal_id points at the governing proposal, and status is a sticky
+  // outcome ('open' | 'passed' | 'failed'). No blockchain involved.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS platform_settings (
+      id INTEGER PRIMARY KEY,
+      fee_percent INTEGER NOT NULL DEFAULT 20,
+      proposed_fee INTEGER NOT NULL DEFAULT 15,
+      fee_proposal_id INTEGER,
+      status TEXT NOT NULL DEFAULT 'open'
+    )
+  `);
+
   // ── Governance proposals seed ───────────────────────────────────────────────
-  // Replace the single legacy proposal with six Yes/No proposals. Internally
-  // votes still use direction 'for'/'against' (Yes=for, No=against) — only the
-  // labels change in the UI — so the existing vote endpoint and on-chain memo
-  // are reused unchanged.
+  // Internally votes use direction 'for'/'against' (Yes=for, No=against) — only
+  // the labels change in the UI — so the existing vote endpoint and on-chain
+  // memo are reused unchanged.
+  //
+  // The two old fee proposals ('Set the platform fee to 20%/30%') are replaced
+  // by a single consolidated Fee Split proposal (id 1) that actually governs the
+  // displayed fee via platform_settings + evaluateFeeOutcome().
   //
   // Re-run-safe migration (runs in all environments — these are product content
   // with no prior prod data, like the original seed):
-  //   1. Retire the legacy proposal keyed on its TITLE (never the bare id=1, or
-  //      a redeploy would wipe real votes on the new proposal #1). After the
-  //      first boot the title is gone, so subsequent boots delete nothing.
-  //   2. Insert the six proposals at fixed ids with ON CONFLICT DO NOTHING, so
+  //   1. Retire by TITLE the legacy proposal and the two old fee proposals,
+  //      deleting their votes first. Keyed on title (never a bare id) so once
+  //      the new proposal #1 exists with its own title, later boots delete
+  //      nothing and accumulated votes on it are preserved.
+  //   2. Insert the proposals at fixed ids with ON CONFLICT DO NOTHING, so
   //      later boots are no-ops and accumulated votes are preserved.
   //   3. Bump the serial sequence past the explicit ids (belt-and-suspenders;
   //      nothing inserts proposals via the API today).
-  await pool.query(`DELETE FROM votes WHERE proposal_id IN (SELECT id FROM governance_proposals WHERE title = 'Fee Split Adjustment')`);
-  await pool.query(`DELETE FROM governance_proposals WHERE title = 'Fee Split Adjustment'`);
+  const FEE_PROPOSAL_ID = 1;
+  const RETIRED_TITLES = [
+    'Fee Split Adjustment',
+    'Set the platform fee to 20%',
+    'Set the platform fee to 30%',
+  ];
+  await pool.query(
+    `DELETE FROM votes WHERE proposal_id IN (SELECT id FROM governance_proposals WHERE title = ANY($1))`,
+    [RETIRED_TITLES]
+  );
+  await pool.query(`DELETE FROM governance_proposals WHERE title = ANY($1)`, [RETIRED_TITLES]);
 
   const seededProposals = [
-    [1, 'Set the platform fee to 20%', "Lower the gallery's cut on every sale to a flat 20%."],
-    [2, 'Set the platform fee to 30%', "Raise the gallery's cut on every sale to a flat 30% to fund more programs."],
+    [FEE_PROPOSAL_ID, 'Fee Split — lower the platform fee from 20% to 15%',
+      "Cut the gallery's cut on every sale from 20% to 15%, so artists keep more of each sale. If this passes, the platform fee updates to 15% for all new sales."],
     [3, 'Allocate 40% of the treasury to marketing & reach', 'Commit 40% of the collective treasury to advertising, partnerships and audience growth.'],
     [4, 'Introduce a 2% artist dividend from each sale', 'Pay every enrolled artist a 2% dividend funded from each sale across the collective.'],
     [5, 'Feature one rising artist on the homepage each week', 'Spotlight a different emerging member on the public homepage every week.'],
@@ -820,9 +928,15 @@ async function start() {
   }
   await pool.query(`SELECT setval(pg_get_serial_sequence('governance_proposals', 'id'), GREATEST((SELECT MAX(id) FROM governance_proposals), 1))`);
 
-  // Set fee_value on the two fee proposals — idempotent UPDATEs on every boot.
-  await pool.query(`UPDATE governance_proposals SET fee_value = 20 WHERE id = 1`);
-  await pool.query(`UPDATE governance_proposals SET fee_value = 30 WHERE id = 2`);
+  // Seed the single platform_settings row (all environments). Current fee 20%,
+  // a passing Fee Split vote sets it to 15%. ON CONFLICT DO NOTHING preserves a
+  // decided outcome across redeploys. fee_proposal_id ties it to the Fee Split
+  // proposal so the vote endpoint knows when to re-evaluate.
+  await pool.query(`
+    INSERT INTO platform_settings (id, fee_percent, proposed_fee, fee_proposal_id, status)
+    VALUES (1, 20, 15, $1, 'open')
+    ON CONFLICT (id) DO NOTHING
+  `, [FEE_PROPOSAL_ID]);
 
   // ── Forum starter threads seed ──────────────────────────────────────────────
   // Seeded in all environments (product content; forum tables are public so a
@@ -869,15 +983,14 @@ async function start() {
     // staging. (votes is staging:private — no rows copy from prod.) direction
     // stays 'for'/'against' internally; the UI renders these as Yes/No.
     const mockVotes = [
-      // Proposal 1 — Set fee to 20%: leans Yes
+      // Proposal 1 — Fee Split (20% → 15%): 4 Yes / 1 No → meets quorum (4) with
+      // a Yes majority, so evaluateFeeOutcome() flips it to passed and the
+      // displayed fee updates to 15% in the demo.
       [1, 9001, 'staging-artist-1', 'for'],
       [1, 9002, 'staging-artist-2', 'for'],
       [1, 9003, 'staging-artist-3', 'for'],
+      [1, 9005, 'staging-artist-5', 'for'],
       [1, 9004, 'staging-artist-4', 'against'],
-      // Proposal 2 — Set fee to 30%: leans No
-      [2, 9001, 'staging-artist-1', 'against'],
-      [2, 9002, 'staging-artist-2', 'against'],
-      [2, 9003, 'staging-artist-3', 'for'],
       // Proposal 3 — 40% to marketing: split
       [3, 9001, 'staging-artist-1', 'for'],
       [3, 9002, 'staging-artist-2', 'against'],
@@ -966,6 +1079,10 @@ async function start() {
     }
     await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
     await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
+
+    // Resolve the Fee Split outcome from the seeded votes so the demo (/?demo=1)
+    // shows the passed state: fee updated to 15%, badge "Passed — fee updated to 15%".
+    await evaluateFeeOutcome();
   }
 
   // Sync the effective fee to app_settings based on current vote tallies.
