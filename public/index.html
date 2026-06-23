@@ -915,6 +915,204 @@
       border-top: 1px solid var(--line);
     }
 
+    /* ── Direct Messages ── */
+    .dm-new-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem 1.1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-bottom: 1rem;
+    }
+    .dm-new-btn:hover { opacity: 0.82; }
+
+    .dm-new-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+    }
+    .dm-new-form select,
+    .dm-new-form textarea {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      transition: border-color 0.15s;
+      resize: vertical;
+    }
+    .dm-new-form select:focus,
+    .dm-new-form textarea:focus { border-color: var(--accent); }
+    .dm-new-form select option { background: var(--paper); color: var(--ink); }
+    .dm-new-form textarea::placeholder { color: var(--ink-2); }
+    .dm-new-form button {
+      align-self: flex-start;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem 1.1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .dm-new-form button:hover:not(:disabled) { opacity: 0.82; }
+    .dm-new-form button:disabled { opacity: 0.45; cursor: default; }
+
+    .dm-conv-row {
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-left: 3px solid transparent;
+      border-radius: 4px;
+      padding: 0.9rem 1.25rem;
+      margin-bottom: 0.6rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .dm-conv-row:hover { border-color: var(--accent); }
+    .dm-conv-row.has-unread { border-left-color: var(--accent); }
+    .dm-conv-left { flex: 1; min-width: 0; }
+    .dm-conv-username {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 0.2rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-conv-preview {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dm-conv-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0.3rem;
+      flex-shrink: 0;
+    }
+    .dm-conv-time { font-size: 0.75rem; color: var(--ink-2); white-space: nowrap; }
+    .dm-unread-dot { width: 8px; height: 8px; background: var(--accent); border-radius: 50%; }
+
+    .dm-back {
+      background: none;
+      border: none;
+      color: var(--ink-2);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.25rem 0;
+      margin-bottom: 1rem;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .dm-back:hover { color: var(--ink); }
+
+    .dm-thread-header {
+      font-family: var(--serif);
+      font-size: 1.5rem;
+      font-weight: 400;
+      line-height: 1.2;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 0.75rem;
+    }
+
+    .dm-messages { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.5rem; }
+    .dm-msg { max-width: 75%; }
+    .dm-msg-own { align-self: flex-end; text-align: right; }
+    .dm-msg-other { align-self: flex-start; text-align: left; }
+    .dm-msg-meta { font-size: 0.75rem; color: var(--ink-2); margin-bottom: 0.2rem; }
+    .dm-msg-other .dm-msg-username { font-weight: 600; color: var(--ink); }
+    .dm-msg-bubble {
+      display: inline-block;
+      background: var(--paper-2);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0.6rem 0.85rem;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      text-align: left;
+    }
+    .dm-msg-own .dm-msg-bubble { color: var(--ink-2); }
+    .dm-msg-other .dm-msg-bubble { color: var(--ink); }
+
+    .dm-reply-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--line);
+    }
+    .dm-reply-form textarea {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      outline: none;
+      resize: vertical;
+      transition: border-color 0.15s;
+    }
+    .dm-reply-form textarea:focus { border-color: var(--accent); }
+    .dm-reply-form textarea::placeholder { color: var(--ink-2); }
+    .dm-reply-form button {
+      align-self: flex-start;
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 0.55rem 1.1rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .dm-reply-form button:hover:not(:disabled) { opacity: 0.82; }
+    .dm-reply-form button:disabled { opacity: 0.45; cursor: default; }
+
+    .dm-empty { font-size: 0.84rem; color: var(--ink-2); padding: 0.35rem 0; }
+
+    .dm-author-link {
+      background: none;
+      border: none;
+      color: var(--ink);
+      font: inherit;
+      font-weight: 500;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      transition: text-decoration-color 0.15s, color 0.15s;
+    }
+    .dm-author-link:hover { text-decoration-color: var(--accent); color: var(--accent); }
+
     /* ── Mobile bottom nav ── */
     #mobile-bottom-nav {
       position: fixed;
@@ -1085,6 +1283,7 @@
     <button id="tab-dash" class="tab active">Dashboard</button>
     <button id="tab-ledger" class="tab">Ledger</button>
     <button id="tab-forum" class="tab">Forum</button>
+    <button id="tab-messages" class="tab">Messages</button>
     <button id="tab-web" class="tab">Desktop access</button>
   </nav>
   <div class="header-right">
@@ -1230,6 +1429,34 @@
   </div>
 </div>
 
+<!-- View: Messages -->
+<div id="view-messages" class="view hidden">
+  <!-- Sub-view: conversation list -->
+  <div id="dm-list-view">
+    <div class="dash-header">
+      <h1>Messages</h1>
+      <p class="subtitle">Private conversations with other members.</p>
+    </div>
+    <button id="dm-new-btn" class="dm-new-btn" type="button">New message</button>
+    <div id="dm-new-form-wrap" class="card" style="display:none; margin-bottom:1rem;">
+      <h2>Start a conversation</h2>
+      <div class="dm-new-form">
+        <select id="dm-recipient-select">
+          <option value="">Select a member…</option>
+        </select>
+        <textarea id="dm-new-body" placeholder="Write a message…" required maxlength="5000" rows="3"></textarea>
+        <button type="button" id="dm-new-send">Send</button>
+      </div>
+    </div>
+    <div id="dm-conversations"></div>
+  </div>
+  <!-- Sub-view: conversation thread -->
+  <div id="dm-thread-view" class="hidden">
+    <button class="dm-back" id="dm-back">← Back to messages</button>
+    <div id="dm-thread-detail"></div>
+  </div>
+</div>
+
 <!-- View: Desktop access -->
 <div id="view-web" class="view hidden">
   <div class="dash-header">
@@ -1311,6 +1538,8 @@
   var HEADERS = TOKEN ? { 'x-usernode-token': TOKEN } : {};
   var NATIVE = false;
   var userAddr = '';
+  var currentUserId = 0;
+  var currentDmConvId = null;
   var cachedLedger = [];
   var dbSales = [];
   var dbEnrolments = [];
@@ -1848,10 +2077,13 @@
     el.innerHTML = threads.map(function (t) {
       var count = t.reply_count || 0;
       var replyLabel = count === 1 ? '1 reply' : count + ' replies';
+      var authorHtml = (t.user_id && currentUserId && t.user_id !== currentUserId)
+        ? '<button class="dm-author-link thread-author" data-uid="' + t.user_id + '" data-uname="' + esc(t.username) + '">' + esc(t.username) + '</button>'
+        : '<span class="thread-author">' + esc(t.username) + '</span>';
       return '<div class="thread-row" data-id="' + t.id + '">' +
         '<div class="thread-row-title">' + esc(t.title) + '</div>' +
         '<div class="thread-row-meta">' +
-          '<span class="thread-author">' + esc(t.username) + '</span>' +
+          authorHtml +
           '<span>' + replyLabel + '</span>' +
           '<span>' + esc(formatStamp(t.last_activity || t.created_at)) + '</span>' +
         '</div>' +
@@ -1861,6 +2093,13 @@
     el.querySelectorAll('.thread-row').forEach(function (row) {
       row.addEventListener('click', function () {
         openThread(parseInt(row.dataset.id, 10));
+      });
+    });
+
+    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
       });
     });
   }
@@ -1875,9 +2114,16 @@
     });
   }
 
-  function renderPost(author, ts, body, isOp) {
+  function renderPost(author, uid, ts, body, isOp) {
+    var isOwn = uid && currentUserId && uid === currentUserId;
+    var authorHtml;
+    if (isOwn || !uid) {
+      authorHtml = '<span class="post-author">' + esc(author) + '</span>';
+    } else {
+      authorHtml = '<button class="dm-author-link" data-uid="' + uid + '" data-uname="' + esc(author) + '">' + esc(author) + '</button>';
+    }
     return '<div class="post' + (isOp ? ' post-op' : '') + '">' +
-      '<div class="post-meta"><span class="post-author">' + esc(author) + '</span> · ' +
+      '<div class="post-meta">' + authorHtml + ' · ' +
         esc(formatStamp(ts)) + '</div>' +
       '<div class="post-body">' + esc(body) + '</div>' +
     '</div>';
@@ -1886,13 +2132,13 @@
   function renderThreadDetail(thread, replies) {
     var el = document.getElementById('forum-thread-detail');
     var html = '<div class="thread-detail-title">' + esc(thread.title) + '</div>' +
-      renderPost(thread.username, thread.created_at, thread.body, true);
+      renderPost(thread.username, thread.user_id, thread.created_at, thread.body, true);
 
     html += '<div class="replies-label">' +
       (replies.length === 1 ? '1 reply' : replies.length + ' replies') + '</div>';
     if (replies.length) {
       html += replies.map(function (r) {
-        return renderPost(r.username, r.created_at, r.body, false);
+        return renderPost(r.username, r.user_id, r.created_at, r.body, false);
       }).join('');
     } else {
       html += '<p class="forum-empty">No replies yet — be the first.</p>';
@@ -1904,6 +2150,12 @@
     '</form>';
 
     el.innerHTML = html;
+
+    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+      });
+    });
 
     document.getElementById('forum-reply-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -1969,9 +2221,229 @@
     });
   });
 
+  // ── Direct Messages ──────────────────────────────────────────────────────────
+
+  function relativeTime(ts) {
+    if (!ts) return '';
+    var ms = typeof ts === 'number' ? (ts > 1e10 ? ts : ts * 1000) : new Date(ts).getTime();
+    if (isNaN(ms)) return '';
+    var diff = (Date.now() - ms) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    var d = new Date(ms);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  function showDmList() {
+    document.getElementById('dm-list-view').classList.remove('hidden');
+    document.getElementById('dm-thread-view').classList.add('hidden');
+    currentDmConvId = null;
+  }
+
+  function showDmThread() {
+    document.getElementById('dm-list-view').classList.add('hidden');
+    document.getElementById('dm-thread-view').classList.remove('hidden');
+  }
+
+  function loadDmUnreadCount() {
+    return api('/api/dm/unread-count').then(function (data) {
+      updateDmBadge((data && data.count) || 0);
+    }).catch(function () {});
+  }
+
+  function updateDmBadge(count) {
+    var tab = document.getElementById('tab-messages');
+    if (!tab) return;
+    tab.textContent = count > 0 ? 'Messages · ' + count : 'Messages';
+  }
+
+  function loadDmConversations() {
+    var el = document.getElementById('dm-conversations');
+    if (!el) return Promise.resolve();
+    el.innerHTML = '<p class="dm-empty">Loading…</p>';
+    return api('/api/dm/conversations').then(function (data) {
+      renderDmConversations((data && data.conversations) || []);
+      loadDmUnreadCount();
+    }).catch(function () {
+      el.innerHTML = '<p class="dm-empty">Could not load messages. Please try again.</p>';
+    });
+  }
+
+  function renderDmConversations(convs) {
+    var el = document.getElementById('dm-conversations');
+    if (!convs.length) {
+      el.innerHTML = '<p class="dm-empty">You have no messages yet — find a member in the Forum and send them a message.</p>';
+      return;
+    }
+    el.innerHTML = convs.map(function (c) {
+      var raw = c.last_message_body || '';
+      var preview = raw ? (raw.length > 60 ? esc(raw.slice(0, 60)) + '…' : esc(raw)) : '<em>No messages yet</em>';
+      var hasUnread = c.unread_count > 0;
+      return '<div class="dm-conv-row' + (hasUnread ? ' has-unread' : '') + '" data-id="' + c.id + '" data-uname="' + esc(c.other_username) + '">' +
+        '<div class="dm-conv-left">' +
+          '<div class="dm-conv-username">' + esc(c.other_username) + '</div>' +
+          '<div class="dm-conv-preview">' + preview + '</div>' +
+        '</div>' +
+        '<div class="dm-conv-right">' +
+          '<span class="dm-conv-time">' + esc(relativeTime(c.last_message_at)) + '</span>' +
+          (hasUnread ? '<span class="dm-unread-dot"></span>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    el.querySelectorAll('.dm-conv-row').forEach(function (row) {
+      row.addEventListener('click', function () {
+        openDmConversation(parseInt(row.dataset.id, 10), row.dataset.uname);
+      });
+    });
+  }
+
+  function openDmConversation(convId, otherUsername) {
+    currentDmConvId = convId;
+    showDmThread();
+    var el = document.getElementById('dm-thread-detail');
+    el.innerHTML = '<p class="dm-empty">Loading…</p>';
+    return api('/api/dm/conversations/' + convId + '/messages').then(function (data) {
+      renderDmThread(convId, otherUsername, (data && data.messages) || []);
+      loadDmUnreadCount();
+    }).catch(function () {
+      el.innerHTML = '<p class="dm-empty">Could not load this conversation. Please try again.</p>';
+    });
+  }
+
+  function renderDmThread(convId, otherUsername, messages) {
+    var el = document.getElementById('dm-thread-detail');
+    var html = '<div class="dm-thread-header">Conversation with ' + esc(otherUsername) + '</div>';
+    html += '<div class="dm-messages">';
+    if (messages.length) {
+      messages.forEach(function (m) {
+        var isOwn = m.sender_id === currentUserId;
+        html += '<div class="dm-msg ' + (isOwn ? 'dm-msg-own' : 'dm-msg-other') + '">' +
+          '<div class="dm-msg-meta">';
+        if (isOwn) {
+          html += esc(formatStamp(m.created_at));
+        } else {
+          html += '<span class="dm-msg-username">' + esc(m.sender_username) + '</span> · ' + esc(formatStamp(m.created_at));
+        }
+        html += '</div>' +
+          '<div class="dm-msg-bubble">' + esc(m.body) + '</div>' +
+        '</div>';
+      });
+    } else {
+      html += '<p class="dm-empty">No messages yet — say hello!</p>';
+    }
+    html += '</div>';
+
+    html += '<form class="dm-reply-form" id="dm-reply-form">' +
+      '<textarea id="dm-reply-body" placeholder="Write a message…" required maxlength="5000" rows="3"></textarea>' +
+      '<button type="submit">Send</button>' +
+    '</form>';
+
+    el.innerHTML = html;
+
+    document.getElementById('dm-reply-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bodyInput = document.getElementById('dm-reply-body');
+      var submitBtn = e.target.querySelector('button[type="submit"]');
+      var body = bodyInput.value.trim();
+      if (!body) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Sending…';
+      api('/api/dm/conversations/' + convId + '/messages', {
+        method: 'POST',
+        body: JSON.stringify({ body: body }),
+      }).then(function () {
+        bodyInput.value = '';
+        return openDmConversation(convId, otherUsername);
+      }).catch(function (err) {
+        console.error('DM send error:', err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send';
+      });
+    });
+  }
+
+  function startDmWith(uid, username) {
+    if (!uid || !username) return;
+    showView('view-messages');
+    showDmList();
+    api('/api/dm/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ recipient_id: uid, recipient_username: username }),
+    }).then(function (data) {
+      if (data && data.conversation) {
+        openDmConversation(data.conversation.id, username);
+      }
+    }).catch(function (err) {
+      console.error('startDmWith error:', err);
+    });
+  }
+
+  document.getElementById('dm-new-btn').addEventListener('click', function () {
+    var wrap = document.getElementById('dm-new-form-wrap');
+    var isHidden = wrap.style.display === 'none';
+    wrap.style.display = isHidden ? 'block' : 'none';
+    if (isHidden) {
+      var select = document.getElementById('dm-recipient-select');
+      var prev = select.value;
+      select.innerHTML = '<option value="">Select a member…</option>';
+      dbEnrolments.filter(function (e) {
+        return e.user_id !== currentUserId;
+      }).forEach(function (e) {
+        var opt = document.createElement('option');
+        opt.value = JSON.stringify({ id: e.user_id, username: e.username });
+        opt.textContent = e.username;
+        select.appendChild(opt);
+      });
+      if (prev) select.value = prev;
+    }
+  });
+
+  document.getElementById('dm-new-send').addEventListener('click', function () {
+    var select = document.getElementById('dm-recipient-select');
+    var bodyInput = document.getElementById('dm-new-body');
+    var btn = document.getElementById('dm-new-send');
+    var recipRaw = select.value;
+    var body = bodyInput.value.trim();
+    if (!recipRaw || !body) return;
+    var recip;
+    try { recip = JSON.parse(recipRaw); } catch (e) { return; }
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    api('/api/dm/conversations', {
+      method: 'POST',
+      body: JSON.stringify({ recipient_id: recip.id, recipient_username: recip.username }),
+    }).then(function (data) {
+      if (!data || !data.conversation) throw new Error('no conversation');
+      var convId = data.conversation.id;
+      return api('/api/dm/conversations/' + convId + '/messages', {
+        method: 'POST',
+        body: JSON.stringify({ body: body }),
+      }).then(function () {
+        bodyInput.value = '';
+        select.value = '';
+        document.getElementById('dm-new-form-wrap').style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = 'Send';
+        return openDmConversation(convId, recip.username);
+      });
+    }).catch(function (err) {
+      console.error('New DM error:', err);
+      btn.disabled = false;
+      btn.textContent = 'Send';
+    });
+  });
+
+  document.getElementById('dm-back').addEventListener('click', function () {
+    showDmList();
+    loadDmConversations();
+  });
+
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-dash', 'view-ledger', 'view-forum', 'view-web'].forEach(function (id) {
+    ['view-gate', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -1984,6 +2456,7 @@
     document.getElementById('tab-dash').classList.toggle('active', viewId === 'view-dash');
     document.getElementById('tab-ledger').classList.toggle('active', viewId === 'view-ledger');
     document.getElementById('tab-forum').classList.toggle('active', viewId === 'view-forum');
+    document.getElementById('tab-messages').classList.toggle('active', viewId === 'view-messages');
     document.getElementById('tab-web').classList.toggle('active', viewId === 'view-web');
   }
 
@@ -2003,6 +2476,12 @@
     loadThreads();
   });
 
+  document.getElementById('tab-messages').addEventListener('click', function () {
+    showView('view-messages');
+    showDmList();
+    loadDmConversations();
+  });
+
   document.getElementById('tab-web').addEventListener('click', function () {
     showView('view-web');
   });
@@ -2015,12 +2494,15 @@
       api('/api/enrolments'),
       bridgeGetTxs(),
       fetchArtist(userAddr),
+      api('/api/me'),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
       dbEnrolments = (results[2] && results[2].enrolments) || [];
       cachedLedger = parseTxs(results[3] || []);
       var artist = results[4] || { sales: [], portrait: '' };
+      var me = results[5] || {};
+      currentUserId = me.id || 0;
 
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
@@ -2028,6 +2510,7 @@
       renderAvatar(artist.portrait);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
+      loadDmUnreadCount();
     }).catch(function (err) {
       console.error('Dashboard load error:', err);
     });
@@ -2339,7 +2822,7 @@
   }
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
-  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-web'];
+  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'];
   var navCurrentIdx = 0;
 
   function updateMobNav(idx) {
@@ -2374,6 +2857,7 @@
     updateMobNav(newIdx);
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
+    if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
 
   document.getElementById('mob-nav-next-btn').addEventListener('click', function () {
@@ -2384,6 +2868,7 @@
     updateMobNav(newIdx);
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
+    if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
 
   // Keep the mobile nav in sync when header tabs are clicked
