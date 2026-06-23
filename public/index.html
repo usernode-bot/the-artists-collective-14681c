@@ -743,6 +743,12 @@
       word-break: break-word;
     }
     .web-access-line a { color: var(--accent); }
+    .web-access-url {
+      font-family: 'Courier New', monospace;
+      font-size: 0.84rem;
+      color: var(--accent);
+      word-break: break-all;
+    }
     .web-access-code {
       font-family: 'Courier New', monospace;
       font-size: 1.05rem;
@@ -1624,7 +1630,6 @@
   </div>
   <div class="card">
     <h2>Get a sign-in code</h2>
-    <p class="web-access-intro">Sign in to manage your gallery from a computer.</p>
     <button id="web-access-btn" type="button">Get desktop access code</button>
     <div id="web-access-result" class="hidden"></div>
     <p id="web-access-error" class="hidden"></p>
@@ -2953,8 +2958,9 @@
         var code = data.code || '';
 
         resultEl.innerHTML =
-          '<p class="web-access-line">Sign in on a computer at ' +
-            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
+          '<p class="web-access-line">To edit your gallery and upload images, open ' +
+            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer" class="web-access-url">' + esc(loginUrl.replace(/^https?:\/\//, '')) + '</a>' +
+            ' in your phone&rsquo;s browser (Safari/Chrome) or on a computer, then sign in with your username and this code.</p>' +
           '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
           '<div class="web-access-actions">' +
