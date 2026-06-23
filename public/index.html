@@ -281,6 +281,63 @@
       color: var(--ink-2);
     }
 
+    /* ── Welcome panel ── */
+    #view-welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+      gap: 1.5rem;
+    }
+    #view-welcome h1 {
+      font-family: var(--serif);
+      font-size: 2.2rem;
+      font-weight: 400;
+      line-height: 1.2;
+      max-width: 28rem;
+    }
+    .welcome-points {
+      list-style: none;
+      padding: 0;
+      max-width: 24rem;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .welcome-points li {
+      color: var(--ink-2);
+      font-size: 0.95rem;
+      line-height: 1.55;
+      padding-left: 1.4rem;
+      position: relative;
+    }
+    .welcome-points li::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 1.3rem;
+      line-height: 1.2;
+    }
+    #welcome-enter-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.72rem 1.8rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #welcome-enter-btn:hover { opacity: 0.82; }
+
     #mode-notice {
       font-size: 0.78rem;
       color: var(--ink-2);
@@ -1354,6 +1411,17 @@
   <p id="enter-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:-0.25rem"></p>
   <p id="mode-notice"></p>
   <p class="gate-helper">Already a member? Just tap Enter the studio.</p>
+</div>
+
+<!-- View: Welcome panel (shown once after first enrolment) -->
+<div id="view-welcome" class="view hidden">
+  <h1>You're now a member-owner of The Artists' Collective.</h1>
+  <ul class="welcome-points">
+    <li>You hold an ownership stake in the collective<span id="welcome-tact"></span>.</li>
+    <li>You have full voting rights on governance proposals — one member, one vote.</li>
+    <li>A share of every sale fee funds shared marketing, decided together.</li>
+  </ul>
+  <button id="welcome-enter-btn">Enter the studio →</button>
 </div>
 
 <!-- View: Dashboard -->
@@ -2489,7 +2557,7 @@
 
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -2562,6 +2630,47 @@
     });
   }
 
+  // ── Welcome panel helpers ─────────────────────────────────────────────────
+  // Populate #welcome-tact with the artist's TACT balance (= total sales value).
+  // Falls back to empty string (leaving base text "You hold an ownership stake…")
+  // if TACT is 0 or the fetch fails — which is the normal case for new members.
+  function populateWelcomeTact() {
+    api('/api/sales').then(function (data) {
+      var sales = (data && data.sales) || [];
+      var myAddr = userAddr;
+      var mySales = NATIVE ? sales.filter(function (s) { return s.seller_addr === myAddr; }) : sales;
+      var total = mySales.reduce(function (s, r) { return s + Number(r.amount || 0); }, 0);
+      var el = document.getElementById('welcome-tact');
+      if (el && total > 0) {
+        el.innerHTML = ' — <strong>' + Math.round(total).toLocaleString() + ' TACT</strong>';
+      }
+    }).catch(function () {});
+  }
+
+  function showWelcomePanel() {
+    document.getElementById('site-header').classList.remove('hidden');
+    document.body.classList.add('studio-active');
+    showView('view-welcome');
+    populateWelcomeTact();
+    loadDashboard();
+  }
+
+  function enterStudio() {
+    document.getElementById('site-header').classList.remove('hidden');
+    document.body.classList.add('studio-active');
+    showView('view-dash');
+    updateMobNav(0);
+    loadDashboard();
+  }
+
+  // ── Welcome panel → enter studio ──────────────────────────────────────────
+  document.getElementById('welcome-enter-btn').addEventListener('click', function () {
+    api('/api/enrolments/me/welcome-seen', { method: 'POST' }).catch(function () {});
+    updateMobNav(0);
+    showView('view-dash');
+    // loadDashboard() already running in background — dashboard is ready
+  });
+
   // ── Enter studio ──────────────────────────────────────────────────────────
   document.getElementById('enter-btn').addEventListener('click', function () {
     var btn = document.getElementById('enter-btn');
@@ -2585,15 +2694,18 @@
       // loadDashboard swaps in the real portrait once it resolves.
       renderAvatar('');
 
-      // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
-      // just POST and let the DB decide if it's a new enrolment. A new enrolment
-      // gets a best-effort on-chain receipt.
       if (NATIVE) {
+        // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
+        // just POST and let the DB decide if it's a new enrolment. A new enrolment
+        // gets a best-effort on-chain receipt and triggers the welcome panel.
         api('/api/enrolments', {
           method: 'POST',
           body: JSON.stringify({ addr: userAddr }),
         }).then(function (resp) {
-          if (resp && resp.enrolled && resp.enrolment) {
+          var isNew = resp && resp.enrolled && resp.enrolment;
+          var notSeenWelcome = resp && !resp.enrolled && resp.enrolment && !resp.enrolment.has_seen_welcome;
+
+          if (isNew) {
             bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
               if (result && result.hash) {
                 api('/api/enrolments/' + resp.enrolment.id + '/tx', {
@@ -2606,14 +2718,18 @@
               return refreshDashboard();
             }).catch(function () {});
           }
-        }).catch(function () {});
-      }
 
-      document.getElementById('site-header').classList.remove('hidden');
-      document.body.classList.add('studio-active');
-      showView('view-dash');
-      updateMobNav(0);
-      return loadDashboard();
+          if (isNew || notSeenWelcome) {
+            showWelcomePanel();
+          } else {
+            enterStudio();
+          }
+        }).catch(function () {
+          enterStudio();
+        });
+      } else {
+        enterStudio();
+      }
     }).catch(function (err) {
       console.error('Entry error:', err);
       btn.disabled = false;
@@ -2954,9 +3070,15 @@
           document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
           document.getElementById('site-header').classList.remove('hidden');
           document.body.classList.add('studio-active');
-          showView('view-dash');
-          updateMobNav(0);
-          return loadDashboard();
+          if (data.enrolment && !data.enrolment.has_seen_welcome) {
+            showView('view-welcome');
+            populateWelcomeTact();
+            loadDashboard();
+          } else {
+            showView('view-dash');
+            updateMobNav(0);
+            return loadDashboard();
+          }
         }).catch(function (err) {
           console.error('Auto-entry bridge error:', err);
           autoEnrolBtn.disabled = false;
@@ -2999,6 +3121,19 @@
     setTimeout(function () {
       var enterBtn = document.getElementById('enter-btn');
       if (enterBtn) enterBtn.click();
+    }, 0);
+  }
+
+  // ?demo=welcome shows the one-time welcome panel with a hardcoded TACT value
+  // so the panel can be tested in staging without a real NATIVE wallet session.
+  if (params.get('demo') === 'welcome') {
+    setTimeout(function () {
+      document.getElementById('site-header').classList.remove('hidden');
+      document.body.classList.add('studio-active');
+      var tactEl = document.getElementById('welcome-tact');
+      if (tactEl) tactEl.innerHTML = ' — <strong>1,500 TACT</strong>';
+      showView('view-welcome');
+      loadDashboard();
     }, 0);
   }
 
