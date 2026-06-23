@@ -743,7 +743,7 @@
       margin-bottom: 0.5rem;
       word-break: break-word;
     }
-    .web-access-line a { color: var(--accent); }
+
     .web-access-code {
       font-family: 'Courier New', monospace;
       font-size: 1.05rem;
@@ -2953,20 +2953,26 @@
         var loginUrl = data.login_url || 'https://artists-collective.pages.dev/login';
         var uname = data.username || '';
         var code = data.code || '';
+        var magicUrl = data.magic_url || '';
 
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
-            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
+            '<span class="web-access-url">' + esc(loginUrl) + '</span></p>' +
           '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
+          (magicUrl
+            ? '<p class="web-access-note">Tap Copy link, then open your phone\'s browser (Safari/Chrome) or a computer and paste — you\'ll be signed straight into your studio to upload images.</p>'
+            : '') +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
-            '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' : '') +
           '</div>' +
-          '<p class="web-access-note">This replaces any code you generated before.</p>';
+          (magicUrl ? '' : '<p class="web-access-note">This replaces any code you generated before.</p>');
 
         bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
-        bindCopyButton(document.getElementById('web-access-copy-link'), loginUrl, 'Copy link');
+        if (magicUrl) {
+          bindCopyButton(document.getElementById('web-access-copy-link'), magicUrl, 'Copy link');
+        }
 
         resultEl.classList.remove('hidden');
         webAccessBtn.disabled = false;

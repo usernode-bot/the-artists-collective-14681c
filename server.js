@@ -116,7 +116,7 @@ app.post('/api/web-access-code', async (req, res) => {
   // testable end-to-end. Strict no-op in production.
   if (IS_STAGING) {
     console.log('[web-access-code] staging stub for', username);
-    return res.json({ ok: true, code: '024680', username, login_url: WEB_ACCESS_LOGIN_URL });
+    return res.json({ ok: true, code: '024680', username, login_url: WEB_ACCESS_LOGIN_URL, magic_url: WEB_ACCESS_LOGIN_URL + '?magic=staging-demo-token' });
   }
 
   const key = process.env.WEB_ACCESS_KEY;
@@ -152,6 +152,7 @@ app.post('/api/web-access-code', async (req, res) => {
       code: data.code,
       username: data.username || username,
       login_url: data.login_url || WEB_ACCESS_LOGIN_URL,
+      magic_url: data.magic_url || null,
     });
   } catch (err) {
     console.warn('[web-access-code] request failed:', err.message);
