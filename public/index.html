@@ -164,6 +164,7 @@
       padding: 0.35rem 0.8rem;
       border-radius: 4px;
       cursor: pointer;
+      white-space: nowrap;
       transition: color 0.15s, background 0.15s;
     }
     .tab:hover { color: var(--ink); background: var(--paper-2); }
@@ -1388,9 +1389,10 @@
         gap: 0.4rem;
       }
       .brand { flex: 1; }
+      .header-right { order: 2; }
       header nav {
-        flex-basis: 100%;
-        flex: none;
+        order: 3;
+        flex: 0 0 100%;
         overflow-x: auto;
         flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
