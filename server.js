@@ -27,6 +27,38 @@ const CHAIN_ID = (process.env.CHAIN_ID || process.env.USERNODE_CHAIN_ID || '').t
 const PUBLIC_API_PATHS = new Set(['/health']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
+// ── Fee sync helper ───────────────────────────────────────────────────────────
+// Recomputes the winning fee proposal and persists the result to app_settings.
+// A proposal passes when for_count > against_count AND total votes >= 2.
+// Among passing proposals, the highest for_count wins; lowest fee_value on tie.
+// Safe to call at any time — always writes a value (defaults to 10 if none pass).
+async function syncFeePct() {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        p.fee_value,
+        COALESCE(SUM(CASE WHEN v.direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
+        COALESCE(SUM(CASE WHEN v.direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count
+      FROM governance_proposals p
+      LEFT JOIN votes v ON v.proposal_id = p.id
+      WHERE p.fee_value IS NOT NULL
+      GROUP BY p.fee_value
+    `);
+    const passing = rows.filter(r => Number(r.for_count) > Number(r.against_count) && (Number(r.for_count) + Number(r.against_count)) >= 2);
+    let newFee = 10;
+    if (passing.length > 0) {
+      passing.sort((a, b) => Number(b.for_count) - Number(a.for_count) || Number(a.fee_value) - Number(b.fee_value));
+      newFee = passing[0].fee_value;
+    }
+    await pool.query(
+      `UPDATE app_settings SET value = $1, updated_at = NOW() WHERE key = 'platform_fee_pct'`,
+      [String(newFee)]
+    );
+  } catch (err) {
+    console.warn('[syncFeePct] error:', err.message);
+  }
+}
+
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -246,7 +278,7 @@ app.get('/api/proposals', async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        p.id, p.title, p.description, p.created_at,
+        p.id, p.title, p.description, p.created_at, p.fee_value,
         COALESCE(SUM(CASE WHEN v.direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
         COALESCE(SUM(CASE WHEN v.direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count,
         MAX(CASE WHEN v.user_id = $1 THEN v.direction END) AS my_vote
@@ -273,7 +305,18 @@ app.post('/api/votes', async (req, res) => {
       ON CONFLICT (proposal_id, user_id)
       DO UPDATE SET direction = EXCLUDED.direction, created_at = NOW()
     `, [proposal_id, req.user.id, req.user.username, direction]);
+    await syncFeePct();
     res.json({ ok: true, direction });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/settings', async (req, res) => {
+  try {
+    const { rows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'platform_fee_pct'`);
+    const feePct = rows.length ? Number(rows[0].value) : 10;
+    res.json({ platform_fee_pct: feePct });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -616,6 +659,19 @@ app.get('*', (req, res) => {
 
 async function start() {
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    INSERT INTO app_settings (key, value) VALUES ('platform_fee_pct', '10')
+    ON CONFLICT (key) DO NOTHING
+  `);
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS governance_proposals (
       id SERIAL PRIMARY KEY,
       title VARCHAR(255) NOT NULL,
@@ -623,6 +679,8 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+
+  await pool.query(`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS fee_value NUMERIC DEFAULT NULL`);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS votes (
@@ -761,6 +819,10 @@ async function start() {
     `, [id, title, description]);
   }
   await pool.query(`SELECT setval(pg_get_serial_sequence('governance_proposals', 'id'), GREATEST((SELECT MAX(id) FROM governance_proposals), 1))`);
+
+  // Set fee_value on the two fee proposals — idempotent UPDATEs on every boot.
+  await pool.query(`UPDATE governance_proposals SET fee_value = 20 WHERE id = 1`);
+  await pool.query(`UPDATE governance_proposals SET fee_value = 30 WHERE id = 2`);
 
   // ── Forum starter threads seed ──────────────────────────────────────────────
   // Seeded in all environments (product content; forum tables are public so a
@@ -905,6 +967,10 @@ async function start() {
     await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
     await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
   }
+
+  // Sync the effective fee to app_settings based on current vote tallies.
+  // Runs in all environments so the DB is always consistent with seeded votes.
+  await syncFeePct();
 
   app.listen(port, () => console.log(`Listening on :${port}`));
 }
