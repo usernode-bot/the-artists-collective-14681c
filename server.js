@@ -456,6 +456,148 @@ app.post('/api/threads/:id/replies', async (req, res) => {
   }
 });
 
+// ── Direct Messages ───────────────────────────────────────────────────────────
+// Both dm_conversations and direct_messages are staging:private — they contain
+// one-to-one chat content. Canonical pair ordering: user_a_id = LEAST(a,b),
+// user_b_id = GREATEST(a,b) so the UNIQUE(user_a_id, user_b_id) constraint
+// deduplicates without needing both orderings.
+
+app.get('/api/dm/conversations', async (req, res) => {
+  try {
+    const uid = req.user.id;
+    const { rows } = await pool.query(`
+      SELECT
+        c.id,
+        CASE WHEN c.user_a_id = $1 THEN c.user_b_id ELSE c.user_a_id END AS other_id,
+        CASE WHEN c.user_a_id = $1 THEN c.user_b_username ELSE c.user_a_username END AS other_username,
+        c.last_message_at,
+        (
+          SELECT LEFT(m.body, 100)
+          FROM direct_messages m
+          WHERE m.conversation_id = c.id
+          ORDER BY m.created_at DESC, m.id DESC
+          LIMIT 1
+        ) AS last_message_body,
+        (
+          SELECT COUNT(*)::int
+          FROM direct_messages m
+          WHERE m.conversation_id = c.id AND m.sender_id != $1 AND m.read_at IS NULL
+        ) AS unread_count
+      FROM dm_conversations c
+      WHERE c.user_a_id = $1 OR c.user_b_id = $1
+      ORDER BY c.last_message_at DESC
+    `, [uid]);
+    res.json({ conversations: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/dm/conversations', async (req, res) => {
+  const uid = req.user.id;
+  const recipId = parseInt((req.body && req.body.recipient_id) || 0, 10);
+  const recipUsername = String((req.body && req.body.recipient_username) || '').trim();
+  if (!recipId || recipId === uid) {
+    return res.status(400).json({ error: 'Invalid recipient' });
+  }
+  if (!recipUsername) {
+    return res.status(400).json({ error: 'Missing recipient_username' });
+  }
+  try {
+    const a_id = Math.min(uid, recipId);
+    const b_id = Math.max(uid, recipId);
+    const a_username = a_id === uid ? req.user.username : recipUsername;
+    const b_username = b_id === uid ? req.user.username : recipUsername;
+
+    await pool.query(`
+      INSERT INTO dm_conversations (user_a_id, user_a_username, user_b_id, user_b_username)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_a_id, user_b_id) DO NOTHING
+    `, [a_id, a_username, b_id, b_username]);
+
+    const { rows } = await pool.query(
+      `SELECT id, user_a_id, user_a_username, user_b_id, user_b_username, last_message_at, created_at
+       FROM dm_conversations WHERE user_a_id = $1 AND user_b_id = $2`,
+      [a_id, b_id]
+    );
+    res.json({ conversation: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/dm/conversations/:id/messages', async (req, res) => {
+  try {
+    const uid = req.user.id;
+    const convId = parseInt(req.params.id, 10);
+    const conv = await pool.query(
+      `SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $2)`,
+      [convId, uid]
+    );
+    if (!conv.rows.length) return res.status(403).json({ error: 'Forbidden' });
+
+    await pool.query(
+      `UPDATE direct_messages SET read_at = NOW()
+       WHERE conversation_id = $1 AND sender_id != $2 AND read_at IS NULL`,
+      [convId, uid]
+    );
+
+    const { rows } = await pool.query(
+      `SELECT id, conversation_id, sender_id, sender_username, body, read_at, created_at
+       FROM direct_messages WHERE conversation_id = $1 ORDER BY created_at ASC, id ASC`,
+      [convId]
+    );
+    res.json({ messages: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/dm/conversations/:id/messages', async (req, res) => {
+  const uid = req.user.id;
+  const convId = parseInt(req.params.id, 10);
+  const body = String((req.body && req.body.body) || '').trim();
+  if (!body) return res.status(400).json({ error: 'Message cannot be empty' });
+  try {
+    const conv = await pool.query(
+      `SELECT id FROM dm_conversations WHERE id = $1 AND (user_a_id = $2 OR user_b_id = $2)`,
+      [convId, uid]
+    );
+    if (!conv.rows.length) return res.status(403).json({ error: 'Forbidden' });
+
+    const { rows } = await pool.query(`
+      INSERT INTO direct_messages (conversation_id, sender_id, sender_username, body)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, conversation_id, sender_id, sender_username, body, read_at, created_at
+    `, [convId, uid, req.user.username, body.slice(0, 5000)]);
+
+    await pool.query(
+      `UPDATE dm_conversations SET last_message_at = NOW() WHERE id = $1`,
+      [convId]
+    );
+    res.json({ message: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/dm/unread-count', async (req, res) => {
+  try {
+    const uid = req.user.id;
+    const { rows } = await pool.query(`
+      SELECT COUNT(*)::int AS count
+      FROM direct_messages dm
+      JOIN dm_conversations c ON c.id = dm.conversation_id
+      WHERE (c.user_a_id = $1 OR c.user_b_id = $1)
+        AND dm.sender_id != $1
+        AND dm.read_at IS NULL
+    `, [uid]);
+    res.json({ count: rows[0].count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
@@ -553,6 +695,37 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+
+  // Direct messages: private (1:1 chats between members). Both tables marked
+  // staging:private so row content never leaks into PR staging containers.
+  // direct_messages → dm_conversations is a private→private FK, which is
+  // permitted (the linter only blocks public→private FKs).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dm_conversations (
+      id SERIAL PRIMARY KEY,
+      user_a_id INTEGER NOT NULL,
+      user_a_username VARCHAR(255) NOT NULL,
+      user_b_id INTEGER NOT NULL,
+      user_b_username VARCHAR(255) NOT NULL,
+      last_message_at TIMESTAMPTZ DEFAULT NOW(),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (user_a_id, user_b_id)
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE dm_conversations IS 'staging:private'`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS direct_messages (
+      id SERIAL PRIMARY KEY,
+      conversation_id INTEGER NOT NULL REFERENCES dm_conversations(id),
+      sender_id INTEGER NOT NULL,
+      sender_username VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+  await pool.query(`COMMENT ON TABLE direct_messages IS 'staging:private'`);
 
   // ── Governance proposals seed ───────────────────────────────────────────────
   // Replace the single legacy proposal with six Yes/No proposals. Internally
@@ -699,6 +872,38 @@ async function start() {
         ON CONFLICT (id) DO NOTHING
       `, [id, uid, uname, addr, title, amount, fee]);
     }
+
+    // Seed DM conversations and messages (both tables are staging:private — empty in staging).
+    // Two conversations for staging-artist-1 (uid 9001) so the Messages tab
+    // renders populated. Message 900003 is intentionally unread to show the badge.
+    const mockDmConvs = [
+      [900001, 9001, 'staging-artist-1', 9002, 'staging-artist-2'],
+      [900002, 9001, 'staging-artist-1', 9003, 'staging-artist-3'],
+    ];
+    for (const [id, a_id, a_uname, b_id, b_uname] of mockDmConvs) {
+      await pool.query(`
+        INSERT INTO dm_conversations (id, user_a_id, user_a_username, user_b_id, user_b_username)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, a_id, a_uname, b_id, b_uname]);
+    }
+    // [id, conv_id, sender_id, sender_username, body, isRead]
+    const mockDmMsgs = [
+      [900001, 900001, 9002, 'staging-artist-2', 'Staging demo — Love the colour palette in your recent piece', true],
+      [900002, 900001, 9001, 'staging-artist-1', 'Staging demo — Thank you! Working on a new series', true],
+      [900003, 900001, 9002, 'staging-artist-2', 'Staging demo — Would you be open to a collaboration?', false],
+      [900004, 900002, 9001, 'staging-artist-1', 'Staging demo — Saw your proposal about the marketing budget', true],
+      [900005, 900002, 9003, 'staging-artist-3', 'Staging demo — Yes, happy to discuss further', true],
+    ];
+    for (const [id, conv_id, sender_id, sender_username, body, isRead] of mockDmMsgs) {
+      await pool.query(`
+        INSERT INTO direct_messages (id, conversation_id, sender_id, sender_username, body, read_at)
+        VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN NOW() ELSE NULL END)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, conv_id, sender_id, sender_username, body, isRead]);
+    }
+    await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
+    await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
   }
 
   app.listen(port, () => console.log(`Listening on :${port}`));
