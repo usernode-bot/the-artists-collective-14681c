@@ -287,6 +287,38 @@
       margin-top: -0.25rem;
     }
 
+    .enrol-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      max-width: 22rem;
+      width: 100%;
+      text-align: left;
+    }
+    .enrol-fields label {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    .enrol-fields input[type="text"],
+    .enrol-fields select {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1.5px solid var(--line);
+      border-radius: 4px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    .enrol-fields input[type="text"]:focus,
+    .enrol-fields select:focus {
+      outline: none;
+      border-color: var(--ink);
+    }
+
     /* ── Shared view wrapper ── */
     .view {
       max-width: 72rem;
@@ -1302,6 +1334,20 @@
       <li>Click <strong>Create your artist account →</strong> — registers you on-chain and opens the membership page.</li>
       <li>Return here and click <strong>Enter the studio →</strong> to access your dashboard.</li>
     </ol>
+  </div>
+  <div class="enrol-fields">
+    <div>
+      <label for="enrol-display-name">Display name</label>
+      <input type="text" id="enrol-display-name" placeholder="Your display name" maxlength="80" autocomplete="off" />
+    </div>
+    <div>
+      <label for="enrol-gender">Gender</label>
+      <select id="enrol-gender">
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="na" selected>Prefer not to say</option>
+      </select>
+    </div>
   </div>
   <button id="enrol-btn">Create your artist account →</button>
   <button id="enter-btn">Enter the studio →</button>
@@ -2594,9 +2640,14 @@
       var addr = results[0];
       var me = results[1] || {};
       var name = me.username || addr;
+      var displayNameInput = document.getElementById('enrol-display-name');
+      var displayName = (displayNameInput && displayNameInput.value.trim()) || name;
+      var genderSelect = document.getElementById('enrol-gender');
+      var gender = genderSelect ? genderSelect.value : 'na';
       var targetUrl = 'https://artists-collective.pages.dev/join'
         + '?addr=' + encodeURIComponent(addr)
-        + '&name=' + encodeURIComponent(name);
+        + '&name=' + encodeURIComponent(displayName)
+        + '&gender=' + encodeURIComponent(gender);
 
       // sendTransaction resolves only after on-chain confirmation; there is no
       // broadcast callback. Race it against a 10s timeout so the tab opens at
@@ -2929,6 +2980,16 @@
       autoEnrolBtn.textContent = 'Create your artist account →';
       autoEnterBtn.textContent = 'Enter the studio →';
     });
+  }
+
+  // Pre-fill display name from username so the artist sees a sensible default.
+  if (TOKEN) {
+    api('/api/me').then(function (me) {
+      if (me && me.username) {
+        var nameInput = document.getElementById('enrol-display-name');
+        if (nameInput && !nameInput.value) nameInput.value = me.username;
+      }
+    }).catch(function () {});
   }
 
   // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
