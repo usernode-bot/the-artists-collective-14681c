@@ -2958,20 +2958,25 @@
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
             '<span class="web-access-url">' + esc(loginUrl) + '</span></p>' +
-          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
+          '<p class="web-access-line">Username for the login page: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
           (magicUrl
-            ? '<p class="web-access-note">Tap Copy link, then open your phone\'s browser (Safari/Chrome) or a computer and paste — you\'ll be signed straight into your studio to upload images.</p>'
+            ? '<p class="web-access-note">Tap <strong>Open in new tab</strong> to sign in instantly, or copy the link and paste it in Safari/Chrome.</p>' +
+              '<p class="web-access-note">If the link has expired, go to the address above and enter the username and code shown here.</p>'
             : '') +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
             (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' : '') +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-open-tab">Open in new tab</button>' : '') +
           '</div>' +
           (magicUrl ? '' : '<p class="web-access-note">This replaces any code you generated before.</p>');
 
         bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
         if (magicUrl) {
           bindCopyButton(document.getElementById('web-access-copy-link'), magicUrl, 'Copy link');
+          document.getElementById('web-access-open-tab').addEventListener('click', function () {
+            window.open(magicUrl, '_blank');
+          });
         }
 
         resultEl.classList.remove('hidden');
