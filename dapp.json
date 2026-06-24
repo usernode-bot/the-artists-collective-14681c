@@ -37,6 +37,8 @@
     { "name": "Mobile header title renders", "path": "/?demo=1", "expectSelector": "#mob-header-title" },
     { "name": "Profile view renders", "path": "/?demo=1", "expectSelector": "#view-profile" },
     { "name": "Welcome panel renders", "path": "/?demo=welcome", "expectSelector": "#view-welcome" },
-    { "name": "Fee Split outcome badge renders", "path": "/?demo=1", "expectSelector": ".proposal-outcome" }
+    { "name": "Fee Split outcome badge renders", "path": "/?demo=1", "expectSelector": ".proposal-outcome" },
+    { "name": "Artwork detail view renders", "path": "/?demo=1", "expectSelector": "#view-artwork" },
+    { "name": "Artwork reactions bar renders", "path": "/?demo=1", "expectSelector": "#artwork-reactions" }
   ]
 }

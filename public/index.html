@@ -552,6 +552,80 @@
     }
     .work-date { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
     .profile-empty { color: var(--ink-2); font-style: italic; margin: 0; }
+    .work-tile { cursor: pointer; }
+    .work-tile:hover .work-thumb { opacity: 0.88; }
+
+    /* ── Artwork detail view ── */
+    .artwork-artist-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .artwork-artist-link:hover { text-decoration: underline; }
+    .artwork-date { color: var(--ink-2); font-size: 0.85rem; margin-top: 0.2rem; }
+
+    .artwork-reactions-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+    }
+    .reaction-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 2rem;
+      background: var(--paper-2);
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .reaction-btn:hover { border-color: var(--accent); }
+    .reaction-btn.active {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, var(--paper-2));
+    }
+    .reaction-count { font-size: 0.8rem; color: var(--ink-2); }
+    .reaction-btn.active .reaction-count { color: var(--accent); }
+
+    .comment-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
+    .comment-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .comment-header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .comment-author {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+    }
+    .comment-author:hover { text-decoration: underline; }
+    .comment-timestamp { font-size: 0.75rem; color: var(--ink-2); }
+    .comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.45; }
+
+    .comment-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .comment-form textarea {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 0.4rem;
+      background: var(--paper-2);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .comment-form textarea:focus { outline: none; border-color: var(--accent); }
+    .comment-form-row { display: flex; justify-content: flex-end; }
+    .comment-signin-hint { color: var(--ink-2); font-style: italic; font-size: 0.9rem; margin: 0.5rem 0 0; }
 
     /* ── Stats grid ── */
     .stats-grid {
@@ -1768,6 +1842,29 @@
   </div>
 </div>
 
+<div id="view-artwork" class="view hidden">
+  <button id="artwork-back" class="forum-back" type="button">← Back</button>
+
+  <div class="card">
+    <h1 id="artwork-title" style="margin:0 0 0.25rem;font-size:1.3rem"></h1>
+    <div id="artwork-date" class="artwork-date"></div>
+    <div style="margin-top:0.5rem">
+      <button id="artwork-artist-btn" class="artwork-artist-link" type="button"></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Reactions</h2>
+    <div id="artwork-reactions" class="artwork-reactions-bar"></div>
+  </div>
+
+  <div class="card">
+    <h2>Comments</h2>
+    <div id="artwork-comments-list" class="comment-list"></div>
+    <div id="artwork-comment-form-wrap"></div>
+  </div>
+</div>
+
 <!-- Mobile bottom navigation -->
 <nav id="mobile-bottom-nav" aria-label="Page navigation">
   <div class="mob-nav-pill">
@@ -2831,7 +2928,7 @@
         var title = w.title || 'Untitled';
         var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
         var date = formatStamp(w.created_at);
-        return '<div class="work-tile">' +
+        return '<div class="work-tile" data-sale-id="' + esc(String(w.id)) + '" data-sale-title="' + esc(title) + '" data-sale-created="' + esc(String(w.created_at || '')) + '">' +
           '<div class="work-thumb">' + esc(initial) + '</div>' +
           '<div class="work-meta">' +
             '<div class="work-title">' + esc(title) + '</div>' +
@@ -2840,6 +2937,17 @@
         '</div>';
       }).join('') +
     '</div>';
+    el.querySelectorAll('.work-tile').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        openArtwork(
+          parseInt(tile.dataset.saleId, 10),
+          tile.dataset.saleTitle || '',
+          tile.dataset.saleCreated || '',
+          profileCurrent.userId,
+          profileCurrent.username
+        );
+      });
+    });
   }
 
   function renderProfile(data) {
@@ -2966,9 +3074,133 @@
     });
   });
 
+  // ── Artwork detail view ────────────────────────────────────────────────────
+  var artworkCurrent = {};
+
+  function openArtwork(saleId, title, createdAt, artistUserId, artistUsername) {
+    artworkCurrent = { saleId: saleId, title: title, createdAt: createdAt, artistUserId: artistUserId, artistUsername: artistUsername };
+    showView('view-artwork');
+    document.getElementById('artwork-title').textContent = title || 'Untitled';
+    var dateEl = document.getElementById('artwork-date');
+    var dateStr = createdAt ? formatStamp(createdAt) : '';
+    dateEl.textContent = dateStr ? 'Recorded ' + dateStr : '';
+    var artistBtn = document.getElementById('artwork-artist-btn');
+    artistBtn.textContent = artistUsername || 'Artist';
+    document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2);font-size:0.85rem">Loading…</span>';
+    document.getElementById('artwork-comments-list').innerHTML = '';
+    document.getElementById('artwork-comment-form-wrap').innerHTML = '';
+
+    Promise.all([
+      api('/api/artworks/' + saleId + '/reactions'),
+      api('/api/artworks/' + saleId + '/comments'),
+    ]).then(function (results) {
+      renderArtworkReactions(saleId, results[0]);
+      renderArtworkComments(saleId, results[1]);
+    }).catch(function (err) {
+      console.error('Artwork load error:', err);
+      document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2)">Could not load reactions.</span>';
+    });
+  }
+
+  function renderArtworkReactions(saleId, data) {
+    var counts = (data && data.counts) || {};
+    var myEmoji = (data && data.myEmoji) || null;
+    var emojis = ['❤️', '🔥', '👏', '✨', '🎨'];
+    var el = document.getElementById('artwork-reactions');
+    el.innerHTML = emojis.map(function (emoji) {
+      var count = counts[emoji] || 0;
+      var active = emoji === myEmoji ? ' active' : '';
+      return '<button class="reaction-btn' + active + '" data-emoji="' + esc(emoji) + '">' +
+        emoji + ' <span class="reaction-count">' + count + '</span>' +
+      '</button>';
+    }).join('');
+    el.querySelectorAll('.reaction-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var emoji = btn.dataset.emoji;
+        api('/api/artworks/' + saleId + '/reactions', {
+          method: 'POST',
+          body: JSON.stringify({ emoji: emoji }),
+        }).then(function (res) {
+          renderArtworkReactions(saleId, res);
+        }).catch(function (err) {
+          console.error('Reaction error:', err);
+        });
+      });
+    });
+  }
+
+  function renderArtworkComments(saleId, data) {
+    var comments = (data && data.comments) || [];
+    var listEl = document.getElementById('artwork-comments-list');
+    var formWrap = document.getElementById('artwork-comment-form-wrap');
+
+    if (!comments.length) {
+      listEl.innerHTML = '<p class="profile-empty">No comments yet.</p>';
+    } else {
+      listEl.innerHTML = comments.map(function (c) {
+        return '<div class="comment-item">' +
+          '<div class="comment-header">' +
+            '<button class="comment-author" data-uid="' + esc(String(c.user_id)) + '" data-uname="' + esc(c.username) + '">' + esc(c.username) + '</button>' +
+            '<span class="comment-timestamp">' + esc(formatStamp(c.created_at) || '') + '</span>' +
+          '</div>' +
+          '<div class="comment-body">' + esc(c.body) + '</div>' +
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('.comment-author').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        });
+      });
+    }
+
+    if (currentUserId) {
+      formWrap.innerHTML =
+        '<form class="comment-form" id="artwork-comment-form">' +
+          '<textarea placeholder="Add a comment…" maxlength="500" rows="2" required></textarea>' +
+          '<div class="comment-form-row"><button type="submit">Post</button></div>' +
+        '</form>';
+      document.getElementById('artwork-comment-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var textarea = e.target.querySelector('textarea');
+        var submitBtn = e.target.querySelector('button[type="submit"]');
+        var body = textarea.value.trim();
+        if (!body) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting…';
+        api('/api/artworks/' + saleId + '/comments', {
+          method: 'POST',
+          body: JSON.stringify({ body: body }),
+        }).then(function () {
+          textarea.value = '';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Post';
+          return api('/api/artworks/' + saleId + '/comments');
+        }).then(function (res) {
+          renderArtworkComments(saleId, res);
+        }).catch(function (err) {
+          console.error('Comment error:', err);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Post';
+        });
+      });
+    } else {
+      formWrap.innerHTML = '<p class="comment-signin-hint">Sign in to comment.</p>';
+    }
+  }
+
+  document.getElementById('artwork-back').addEventListener('click', function () {
+    showView('view-profile');
+  });
+
+  document.getElementById('artwork-artist-btn').addEventListener('click', function () {
+    if (artworkCurrent.artistUserId) {
+      openProfile(artworkCurrent.artistUserId, artworkCurrent.artistUsername);
+    }
+  });
+
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-artwork'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
