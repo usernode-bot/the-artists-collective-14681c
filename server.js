@@ -507,7 +507,7 @@ app.get('/api/artists/:id', async (req, res) => {
     }
 
     const worksRes = await pool.query(
-      `SELECT title, created_at FROM sales WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
+      `SELECT id, title, created_at FROM sales WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
       [uid]
     );
 
@@ -640,6 +640,134 @@ app.post('/api/artists/me/bio', async (req, res) => {
       return res.status(400).json({ error: 'Enrol before editing your profile' });
     }
     res.json({ ok: true, bio });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/artists/:id/collections', async (req, res) => {
+  const uid = parseInt(req.params.id, 10);
+  if (!uid) return res.status(400).json({ error: 'Invalid artist id' });
+  try {
+    const { rows } = await pool.query(`
+      SELECT c.id, c.title, c.created_at, COUNT(ci.id)::int AS item_count
+      FROM collections c
+      LEFT JOIN collection_items ci ON ci.collection_id = c.id
+      WHERE c.user_id = $1
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `, [uid]);
+    res.json({ collections: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Artwork reactions & comments ─────────────────────────────────────────────
+const ALLOWED_EMOJIS = ['❤️', '🔥', '👏', '✨', '🎨'];
+
+app.get('/api/artworks/:saleId/reactions', async (req, res) => {
+  const saleId = parseInt(req.params.saleId, 10);
+  if (!saleId) return res.status(400).json({ error: 'Invalid saleId' });
+  try {
+    const countsRes = await pool.query(
+      `SELECT emoji, COUNT(*)::int AS cnt FROM artwork_reactions WHERE sale_id = $1 GROUP BY emoji`,
+      [saleId]
+    );
+    const counts = {};
+    for (const e of ALLOWED_EMOJIS) counts[e] = 0;
+    for (const row of countsRes.rows) if (counts[row.emoji] !== undefined) counts[row.emoji] = row.cnt;
+
+    let myEmoji = null;
+    if (req.user) {
+      const myRes = await pool.query(
+        `SELECT emoji FROM artwork_reactions WHERE sale_id = $1 AND user_id = $2`,
+        [saleId, req.user.id]
+      );
+      myEmoji = myRes.rows[0] ? myRes.rows[0].emoji : null;
+    }
+    res.json({ counts, myEmoji });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artworks/:saleId/reactions', async (req, res) => {
+  const saleId = parseInt(req.params.saleId, 10);
+  if (!saleId) return res.status(400).json({ error: 'Invalid saleId' });
+  const emoji = (req.body && req.body.emoji) || '';
+  if (!ALLOWED_EMOJIS.includes(emoji)) return res.status(400).json({ error: 'Invalid emoji' });
+  try {
+    const saleCheck = await pool.query(`SELECT id FROM sales WHERE id = $1`, [saleId]);
+    if (!saleCheck.rows.length) return res.status(404).json({ error: 'Artwork not found' });
+
+    const existing = await pool.query(
+      `SELECT emoji FROM artwork_reactions WHERE sale_id = $1 AND user_id = $2`,
+      [saleId, req.user.id]
+    );
+    if (existing.rows.length && existing.rows[0].emoji === emoji) {
+      await pool.query(
+        `DELETE FROM artwork_reactions WHERE sale_id = $1 AND user_id = $2`,
+        [saleId, req.user.id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO artwork_reactions (sale_id, user_id, username, emoji)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (sale_id, user_id) DO UPDATE SET emoji = EXCLUDED.emoji, created_at = NOW()`,
+        [saleId, req.user.id, req.user.username, emoji]
+      );
+    }
+
+    const countsRes = await pool.query(
+      `SELECT emoji, COUNT(*)::int AS cnt FROM artwork_reactions WHERE sale_id = $1 GROUP BY emoji`,
+      [saleId]
+    );
+    const counts = {};
+    for (const e of ALLOWED_EMOJIS) counts[e] = 0;
+    for (const row of countsRes.rows) if (counts[row.emoji] !== undefined) counts[row.emoji] = row.cnt;
+    const myRes = await pool.query(
+      `SELECT emoji FROM artwork_reactions WHERE sale_id = $1 AND user_id = $2`,
+      [saleId, req.user.id]
+    );
+    const myEmoji = myRes.rows[0] ? myRes.rows[0].emoji : null;
+    res.json({ counts, myEmoji });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/artworks/:saleId/comments', async (req, res) => {
+  const saleId = parseInt(req.params.saleId, 10);
+  if (!saleId) return res.status(400).json({ error: 'Invalid saleId' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT id, user_id, username, body, created_at FROM artwork_comments WHERE sale_id = $1 ORDER BY created_at ASC`,
+      [saleId]
+    );
+    res.json({ comments: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artworks/:saleId/comments', async (req, res) => {
+  const saleId = parseInt(req.params.saleId, 10);
+  if (!saleId) return res.status(400).json({ error: 'Invalid saleId' });
+  const body = String((req.body && req.body.body) || '').trim();
+  if (!body) return res.status(400).json({ error: 'Comment body required' });
+  if (body.length > 500) return res.status(400).json({ error: 'Comment too long (max 500 chars)' });
+  try {
+    const saleCheck = await pool.query(`SELECT id FROM sales WHERE id = $1`, [saleId]);
+    if (!saleCheck.rows.length) return res.status(404).json({ error: 'Artwork not found' });
+
+    const { rows } = await pool.query(
+      `INSERT INTO artwork_comments (sale_id, user_id, username, body)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, user_id, username, body, created_at`,
+      [saleId, req.user.id, req.user.username, body]
+    );
+    res.json({ comment: rows[0] });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -857,6 +985,129 @@ app.get('/api/dm/unread-count', async (req, res) => {
   }
 });
 
+// ── Collections ──────────────────────────────────────────────────────────────
+app.get('/api/collections', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT
+        c.id, c.user_id, c.username, c.title, c.description, c.created_at,
+        COUNT(ci.id)::int AS item_count
+      FROM collections c
+      LEFT JOIN collection_items ci ON ci.collection_id = c.id
+      GROUP BY c.id
+      ORDER BY c.created_at DESC
+    `);
+    res.json({ collections: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/collections', async (req, res) => {
+  const title = String((req.body && req.body.title) || '').trim();
+  const description = String((req.body && req.body.description) || '').trim();
+  if (!title) return res.status(400).json({ error: 'Title is required' });
+  try {
+    const { rows } = await pool.query(`
+      INSERT INTO collections (user_id, username, title, description)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, user_id, username, title, description, created_at
+    `, [req.user.id, req.user.username, title.slice(0, 255), description.slice(0, 2000) || null]);
+    res.json({ collection: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/collections/:id', async (req, res) => {
+  try {
+    const collRes = await pool.query(
+      `SELECT id, user_id, username, title, description, created_at FROM collections WHERE id = $1`,
+      [req.params.id]
+    );
+    if (!collRes.rows.length) return res.status(404).json({ error: 'Collection not found' });
+    const itemRes = await pool.query(
+      `SELECT id, sale_id, work_title, artist_username, position, added_at
+       FROM collection_items WHERE collection_id = $1 ORDER BY position ASC, id ASC`,
+      [req.params.id]
+    );
+    res.json({ collection: collRes.rows[0], items: itemRes.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/collections/:id/items', async (req, res) => {
+  const saleId = parseInt((req.body && req.body.sale_id) || 0, 10);
+  if (!saleId) return res.status(400).json({ error: 'sale_id is required' });
+  try {
+    const collRes = await pool.query(
+      `SELECT id, user_id FROM collections WHERE id = $1`, [req.params.id]
+    );
+    if (!collRes.rows.length) return res.status(404).json({ error: 'Collection not found' });
+    if (collRes.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM collection_items WHERE collection_id = $1`, [req.params.id]
+    );
+    if (countRes.rows[0].n >= 20) return res.status(400).json({ error: 'Collections are limited to 20 works' });
+
+    const saleRes = await pool.query(
+      `SELECT id, title, username FROM sales WHERE id = $1`, [saleId]
+    );
+    if (!saleRes.rows.length) return res.status(404).json({ error: 'Work not found' });
+
+    const posRes = await pool.query(
+      `SELECT COALESCE(MAX(position), 0) + 1 AS next_pos FROM collection_items WHERE collection_id = $1`, [req.params.id]
+    );
+    const nextPos = posRes.rows[0].next_pos;
+
+    const { rows } = await pool.query(`
+      INSERT INTO collection_items (collection_id, sale_id, work_title, artist_username, position)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (collection_id, sale_id) DO NOTHING
+      RETURNING id, sale_id, work_title, artist_username, position, added_at
+    `, [req.params.id, saleId, saleRes.rows[0].title.slice(0, 255), saleRes.rows[0].username, nextPos]);
+
+    if (!rows.length) return res.status(409).json({ error: 'This work is already in the collection' });
+    res.json({ item: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/collections/:id/items/:itemId', async (req, res) => {
+  try {
+    const collRes = await pool.query(
+      `SELECT user_id FROM collections WHERE id = $1`, [req.params.id]
+    );
+    if (!collRes.rows.length) return res.status(404).json({ error: 'Collection not found' });
+    if (collRes.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    await pool.query(
+      `DELETE FROM collection_items WHERE id = $1 AND collection_id = $2`,
+      [req.params.itemId, req.params.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/collections/:id', async (req, res) => {
+  try {
+    const collRes = await pool.query(
+      `SELECT user_id FROM collections WHERE id = $1`, [req.params.id]
+    );
+    if (!collRes.rows.length) return res.status(404).json({ error: 'Collection not found' });
+    if (collRes.rows[0].user_id !== req.user.id) return res.status(403).json({ error: 'Forbidden' });
+    await pool.query(`DELETE FROM collection_items WHERE collection_id = $1`, [req.params.id]);
+    await pool.query(`DELETE FROM collections WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
@@ -1017,6 +1268,35 @@ async function start() {
   `);
   await pool.query(`COMMENT ON TABLE direct_messages IS 'staging:private'`);
 
+  // Artwork reactions: emoji reactions on individual artworks (sales rows).
+  // Public — community-facing engagement data, no sensitive content.
+  // No FK to sales because sales is staging:private (public→private FK is not allowed).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS artwork_reactions (
+      id SERIAL PRIMARY KEY,
+      sale_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      emoji VARCHAR(10) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (sale_id, user_id)
+    )
+  `);
+
+  // Artwork comments: text comments on individual artworks (sales rows).
+  // Public — community discussion, no sensitive content.
+  // No FK to sales for the same reason as artwork_reactions.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS artwork_comments (
+      id SERIAL PRIMARY KEY,
+      sale_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      body TEXT NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
   // Platform settings: single-row table (id always 1) governing the displayed /
   // applied platform fee via the Fee Split proposal. Public — product config, no
   // per-user/financial/personal data, no FK to a private table. fee_percent is
@@ -1030,6 +1310,33 @@ async function start() {
       proposed_fee INTEGER NOT NULL DEFAULT 15,
       fee_proposal_id INTEGER,
       status TEXT NOT NULL DEFAULT 'open'
+    )
+  `);
+
+  // Collections: public showcase content — no financial data, no private FKs.
+  // collection_items stores sale_id as a plain integer (no FK constraint) to
+  // avoid a public→private FK to the staging:private sales table.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      description TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS collection_items (
+      id SERIAL PRIMARY KEY,
+      collection_id INTEGER NOT NULL REFERENCES collections(id),
+      sale_id INTEGER NOT NULL,
+      work_title VARCHAR(255) NOT NULL,
+      artist_username VARCHAR(255) NOT NULL,
+      position INTEGER NOT NULL DEFAULT 0,
+      added_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (collection_id, sale_id)
     )
   `);
 
@@ -1269,6 +1576,77 @@ async function start() {
     }
     await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
     await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
+    await pool.query(`SELECT setval(pg_get_serial_sequence('sales', 'id'), GREATEST((SELECT MAX(id) FROM sales), 1))`);
+
+    // Seed artwork reactions across the demo sales so the reaction bar renders
+    // with non-zero counts in staging (artwork_reactions is a new table, empty).
+    const mockReactions = [
+      [900001, 9001, 'staging-artist-1', '❤️'],
+      [900001, 9002, 'staging-artist-2', '❤️'],
+      [900001, 9003, 'staging-artist-3', '✨'],
+      [900002, 9001, 'staging-artist-1', '🔥'],
+      [900002, 9004, 'staging-artist-4', '🔥'],
+      [900003, 9002, 'staging-artist-2', '👏'],
+      [900003, 9003, 'staging-artist-3', '🎨'],
+      [900003, 9004, 'staging-artist-4', '❤️'],
+      [900004, 9001, 'staging-artist-1', '✨'],
+      [900005, 9003, 'staging-artist-3', '🔥'],
+    ];
+    for (const [sale_id, uid, uname, emoji] of mockReactions) {
+      await pool.query(`
+        INSERT INTO artwork_reactions (sale_id, user_id, username, emoji)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (sale_id, user_id) DO NOTHING
+      `, [sale_id, uid, uname, emoji]);
+    }
+
+    // Seed artwork comments on the demo sales (artwork_comments is a new table, empty).
+    const mockComments = [
+      [900001, 9001, 'staging-artist-1', 900002, 'Staging demo — Absolutely love the warm tones in this one.'],
+      [900002, 9002, 'staging-artist-2', 900001, 'Staging demo — The composition here is stunning.'],
+      [900003, 9003, 'staging-artist-3', 900001, 'Staging demo — Always admired your use of coastal light.'],
+      [900004, 9004, 'staging-artist-4', 900003, 'Staging demo — This palette reminds me of early morning tide.'],
+      [900005, 9001, 'staging-artist-1', 900004, 'Staging demo — Beautiful field study — so much energy in the greens.'],
+    ];
+    for (const [id, uid, uname, sale_id, body] of mockComments) {
+      await pool.query(`
+        INSERT INTO artwork_comments (id, sale_id, user_id, username, body)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, sale_id, uid, uname, body]);
+    }
+    await pool.query(`SELECT setval(pg_get_serial_sequence('artwork_comments', 'id'), GREATEST((SELECT MAX(id) FROM artwork_comments), 1))`);
+
+    // Seed collections. Both tables are newly-created (empty in staging).
+    // Titles and artist_usernames are copied directly — not read from the
+    // staging:private sales table — so the seed is self-contained.
+    const mockCollections = [
+      [900001, 9001, 'staging-artist-1', 'Staging demo — Coastal Studies', 'A selection of works exploring light on water.'],
+      [900002, 9002, 'staging-artist-2', 'Staging demo — Colour Field Picks', 'Blues, greens, and the space between.'],
+    ];
+    for (const [id, uid, uname, title, description] of mockCollections) {
+      await pool.query(`
+        INSERT INTO collections (id, user_id, username, title, description)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, uid, uname, title, description]);
+    }
+    const mockCollectionItems = [
+      [900001, 900001, 900001, 'Staging demo — Autumn Light #1', 'staging-artist-1', 1],
+      [900002, 900001, 900002, 'Staging demo — Blue Resonance #7', 'staging-artist-1', 2],
+      [900003, 900001, 900006, 'Staging demo — Newcomers Print I', 'staging-artist-3', 3],
+      [900004, 900002, 900004, 'Staging demo — Green Field Study', 'staging-artist-2', 1],
+      [900005, 900002, 900005, 'Staging demo — Cerulean Drift', 'staging-artist-2', 2],
+    ];
+    for (const [id, collId, saleId, workTitle, artistUsername, position] of mockCollectionItems) {
+      await pool.query(`
+        INSERT INTO collection_items (id, collection_id, sale_id, work_title, artist_username, position)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT DO NOTHING
+      `, [id, collId, saleId, workTitle, artistUsername, position]);
+    }
+    await pool.query(`SELECT setval(pg_get_serial_sequence('collections', 'id'), GREATEST((SELECT MAX(id) FROM collections), 1))`);
+    await pool.query(`SELECT setval(pg_get_serial_sequence('collection_items', 'id'), GREATEST((SELECT MAX(id) FROM collection_items), 1))`);
 
     // Resolve the Fee Split outcome from the seeded votes so the demo (/?demo=1)
     // shows the passed state: fee updated to 15%, badge "Passed — fee updated to 15%".
