@@ -498,6 +498,27 @@
       cursor: pointer;
     }
     .profile-msg-btn:hover:not(:disabled) { opacity: 0.82; }
+    .profile-msg-btn:disabled { opacity: 0.55; cursor: default; }
+    /* Follow button filled state once you're following. */
+    #profile-follow-btn.is-following { background: var(--accent); color: #fff; }
+    .profile-follow-counts {
+      display: flex;
+      gap: 1rem;
+      margin: 0.35rem 0 0.55rem;
+    }
+    .profile-count {
+      font: inherit;
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+    }
+    .profile-count:hover { color: var(--accent); text-decoration: underline; }
+    .follow-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .follow-list-row { text-align: left; }
+    .feed-author { font-weight: 600; }
     .profile-bio { margin: 0; white-space: pre-wrap; line-height: 1.5; }
     .profile-bio.is-empty { color: var(--ink-2); font-style: italic; }
     #profile-bio-form textarea {
@@ -1784,6 +1805,7 @@
   <span id="mob-header-title" class="mob-header-title">Dashboard</span>
   <nav>
     <button id="tab-dash" class="tab active">Dashboard</button>
+    <button id="tab-feed" class="tab">Feed</button>
     <button id="tab-ledger" class="tab">Ledger</button>
     <button id="tab-forum" class="tab">Forum</button>
     <button id="tab-messages" class="tab">Messages</button>
@@ -2019,11 +2041,21 @@
     <div class="profile-id-text">
       <h1 id="profile-name">Artist</h1>
       <p class="subtitle mono" id="profile-addr"></p>
+      <div class="profile-follow-counts">
+        <button id="profile-followers-count" class="profile-count" type="button">0 followers</button>
+        <button id="profile-following-count" class="profile-count" type="button">0 following</button>
+      </div>
       <div class="profile-actions">
+        <button id="profile-follow-btn" class="profile-msg-btn hidden" type="button">Follow</button>
         <button id="profile-message-btn" class="profile-msg-btn hidden" type="button">Message</button>
         <button id="profile-edit-bio-btn" class="profile-msg-btn hidden" type="button">Edit bio</button>
       </div>
     </div>
+  </div>
+
+  <div class="card profile-follow-list-card hidden" id="profile-follow-list-card">
+    <h2 id="profile-follow-list-title">Followers</h2>
+    <div id="profile-follow-list"></div>
   </div>
 
   <div class="card">
@@ -2094,6 +2126,19 @@
     <h2>Comments</h2>
     <div id="artwork-comments-list" class="comment-list"></div>
     <div id="artwork-comment-form-wrap"></div>
+  </div>
+</div>
+
+<!-- View: Feed (latest works from artists you follow) -->
+<div id="view-feed" class="view hidden">
+  <div class="dash-header">
+    <div class="dash-id-text">
+      <h1>Your feed</h1>
+      <p class="subtitle">The latest work from the artists you follow.</p>
+    </div>
+  </div>
+  <div class="card">
+    <div id="feed-list"><p class="profile-empty">Loading…</p></div>
   </div>
 </div>
 
@@ -3137,11 +3182,12 @@
   // a static #view-profile div is shown via showView, with a "← Back" button
   // that restores whichever view the visitor came from.
   var profilePrevView = 'view-dash';
-  var profileCurrent = null; // { userId, username, addr }
+  var profileCurrent = null; // { userId, username, addr, followingCount }
+  var profileFollowerCount = 0;
 
   function viewIdForActiveTab() {
     // Best-effort "where am I" for Back: the currently-visible non-profile view.
-    var ids = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
+    var ids = ['view-dash', 'view-feed', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (el && !el.classList.contains('hidden')) return ids[i];
@@ -3186,7 +3232,12 @@
     var artist = (data && data.artist) || {};
     var works = (data && data.works) || [];
     var isOwn = artist.user_id && currentUserId && artist.user_id === currentUserId;
-    profileCurrent = { userId: artist.user_id, username: artist.username, addr: artist.addr };
+    profileCurrent = {
+      userId: artist.user_id,
+      username: artist.username,
+      addr: artist.addr,
+      followingCount: artist.following_count || 0,
+    };
 
     document.getElementById('profile-name').textContent = artist.username || 'Artist';
     document.getElementById('profile-addr').textContent = artist.addr ? truncAddr(artist.addr) : '';
@@ -3223,21 +3274,49 @@
     document.getElementById('profile-bio-form').classList.add('hidden');
     bioEl.classList.remove('hidden');
 
+    // Follower / following counts (always shown, even on your own profile).
+    profileFollowerCount = artist.follower_count || 0;
+    renderFollowCounts();
+
+    // Collapse any open follower/following list on each (re)render.
+    document.getElementById('profile-follow-list-card').classList.add('hidden');
+
     // Actions: Message for others (and only when the visitor is enrolled-ish,
-    // i.e. has a user id); Edit bio for your own enrolled profile.
+    // i.e. has a user id); Edit bio for your own enrolled profile; Follow for
+    // anyone else's profile (same gate as Message).
     var msgBtn = document.getElementById('profile-message-btn');
     var editBtn = document.getElementById('profile-edit-bio-btn');
+    var followBtn = document.getElementById('profile-follow-btn');
     if (isOwn) {
       msgBtn.classList.add('hidden');
+      followBtn.classList.add('hidden');
       // Only enrolled artists can hold a bio; the endpoint enforces it too.
       editBtn.classList.toggle('hidden', !artist.enrolled);
     } else {
       editBtn.classList.add('hidden');
       msgBtn.classList.toggle('hidden', !artist.user_id);
+      followBtn.classList.toggle('hidden', !artist.user_id);
+      setFollowBtnState(!!artist.is_following);
     }
 
     renderProfileWorks(works);
     if (artist.user_id) loadProfileCollections(artist.user_id);
+  }
+
+  function renderFollowCounts() {
+    var fc = profileFollowerCount || 0;
+    var gc = (profileCurrent && profileCurrent.followingCount) || 0;
+    document.getElementById('profile-followers-count').textContent =
+      fc + (fc === 1 ? ' follower' : ' followers');
+    document.getElementById('profile-following-count').textContent =
+      gc + ' following';
+  }
+
+  function setFollowBtnState(isFollowing) {
+    var btn = document.getElementById('profile-follow-btn');
+    btn.dataset.following = isFollowing ? '1' : '0';
+    btn.textContent = isFollowing ? 'Following' : 'Follow';
+    btn.classList.toggle('is-following', isFollowing);
   }
 
   function openProfile(userId, username) {
@@ -3245,9 +3324,13 @@
     if (!userId) return;
     profilePrevView = viewIdForActiveTab();
     showView('view-profile');
-    // Optimistic header while the fetch resolves.
+    // Optimistic header while the fetch resolves. Hide follow actions, collapse
+    // any open follower/following list, and clear stale counts so a previous
+    // profile's data doesn't linger during the load.
     document.getElementById('profile-name').textContent = username || 'Artist';
     document.getElementById('profile-addr').textContent = '';
+    document.getElementById('profile-follow-btn').classList.add('hidden');
+    document.getElementById('profile-follow-list-card').classList.add('hidden');
     document.getElementById('profile-works').innerHTML = '<p class="profile-empty">Loading…</p>';
     var qs = username ? ('?username=' + encodeURIComponent(username)) : '';
     return api('/api/artists/' + userId + qs).then(function (data) {
@@ -3266,6 +3349,80 @@
     if (profileCurrent && profileCurrent.userId && profileCurrent.username) {
       startDmWith(profileCurrent.userId, profileCurrent.username);
     }
+  });
+
+  // Follow / unfollow. Optimistically flip the button + follower count, then
+  // reconcile against the server response (mirrors the bio-edit refetch).
+  document.getElementById('profile-follow-btn').addEventListener('click', function () {
+    if (!profileCurrent || !profileCurrent.userId) return;
+    var btn = this;
+    var wasFollowing = btn.dataset.following === '1';
+    var willFollow = !wasFollowing;
+    btn.disabled = true;
+    // Optimistic update.
+    setFollowBtnState(willFollow);
+    profileFollowerCount = Math.max(0, profileFollowerCount + (willFollow ? 1 : -1));
+    renderFollowCounts();
+
+    var req = willFollow
+      ? api('/api/follows', {
+          method: 'POST',
+          body: JSON.stringify({
+            followee_id: profileCurrent.userId,
+            followee_username: profileCurrent.username,
+          }),
+        })
+      : api('/api/follows/' + profileCurrent.userId, { method: 'DELETE' });
+
+    req.then(function (resp) {
+      btn.disabled = false;
+      setFollowBtnState(!!(resp && resp.following));
+    }).catch(function (err) {
+      console.error('Follow toggle error:', err);
+      // Revert the optimistic update.
+      btn.disabled = false;
+      setFollowBtnState(wasFollowing);
+      profileFollowerCount = Math.max(0, profileFollowerCount + (willFollow ? -1 : 1));
+      renderFollowCounts();
+    });
+  });
+
+  // Tappable follower / following counts open an inline list of those members.
+  function showFollowList(kind) {
+    if (!profileCurrent || !profileCurrent.userId) return;
+    var card = document.getElementById('profile-follow-list-card');
+    var titleEl = document.getElementById('profile-follow-list-title');
+    var listEl = document.getElementById('profile-follow-list');
+    titleEl.textContent = kind === 'following' ? 'Following' : 'Followers';
+    listEl.innerHTML = '<p class="profile-empty">Loading…</p>';
+    card.classList.remove('hidden');
+    var emptyMsg = kind === 'following' ? 'Not following anyone yet.' : 'No followers yet.';
+    api('/api/artists/' + profileCurrent.userId + '/' + kind).then(function (data) {
+      var rows = (data && (kind === 'following' ? data.following : data.followers)) || [];
+      if (!rows.length) {
+        listEl.innerHTML = '<p class="profile-empty">' + emptyMsg + '</p>';
+        return;
+      }
+      listEl.innerHTML = '<div class="follow-list">' + rows.map(function (r) {
+        return '<button class="dm-author-link follow-list-row" data-uid="' + r.user_id +
+          '" data-uname="' + esc(r.username) + '">' + esc(r.username) + '</button>';
+      }).join('') + '</div>';
+      listEl.querySelectorAll('.dm-author-link').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        });
+      });
+    }).catch(function (err) {
+      console.error('Follow list error:', err);
+      listEl.innerHTML = '<p class="profile-empty">Could not load this list.</p>';
+    });
+  }
+
+  document.getElementById('profile-followers-count').addEventListener('click', function () {
+    showFollowList('followers');
+  });
+  document.getElementById('profile-following-count').addEventListener('click', function () {
+    showFollowList('following');
   });
 
   document.getElementById('profile-edit-bio-btn').addEventListener('click', function () {
@@ -3307,7 +3464,53 @@
     });
   });
 
-  // ── Collections ──────────────────────────────────────────────────────────────
+  // ── Feed ───────────────────────────────────────────────────────────────────────────
+  // Latest works from the artists the viewer follows. Reuses the work-tile look
+  // from the profile Works grid; the artist name links to their profile.
+  function renderFeed(items) {
+    var el = document.getElementById('feed-list');
+    if (!items || !items.length) {
+      el.innerHTML = '<p class="profile-empty">Your feed is empty. Follow artists from their ' +
+        'profiles — tap a name anywhere in the app — and their latest work will show up here.</p>';
+      return;
+    }
+    el.innerHTML = '<div class="profile-works-grid">' +
+      items.map(function (it) {
+        var title = it.title || 'Untitled';
+        var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
+        var date = formatStamp(it.created_at);
+        var author = it.user_id
+          ? '<button class="dm-author-link feed-author" data-uid="' + it.user_id +
+            '" data-uname="' + esc(it.username) + '">' + esc(it.username) + '</button>'
+          : '<span class="feed-author">' + esc(it.username) + '</span>';
+        return '<div class="work-tile">' +
+          '<div class="work-thumb">' + esc(initial) + '</div>' +
+          '<div class="work-meta">' +
+            '<div class="work-title">' + esc(title) + '</div>' +
+            '<div class="work-date">' + author + (date ? ' · ' + esc(date) : '') + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+      });
+    });
+  }
+
+  function loadFeed() {
+    var el = document.getElementById('feed-list');
+    el.innerHTML = '<p class="profile-empty">Loading…</p>';
+    return api('/api/feed').then(function (data) {
+      renderFeed((data && data.items) || []);
+    }).catch(function (err) {
+      console.error('Feed load error:', err);
+      el.innerHTML = '<p class="profile-empty">Could not load your feed. Please try again.</p>';
+    });
+  }
+
+  // ── Collections ────────────────────────────────────────────────────────────────────────────────────
   var currentCollectionId = null;
 
   function showCollectionsList() {
@@ -3422,7 +3625,6 @@
     }
 
     el.innerHTML = html;
-
     el.querySelectorAll('.dm-author-link').forEach(function (btn) {
       btn.addEventListener('click', function () {
         openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
@@ -3593,8 +3795,9 @@
       submitBtn.disabled = false;
       submitBtn.textContent = 'Create collection';
     });
+  });
 
-  // ── Artwork detail view ────────────────────────────────────────────────────
+  // ── Artwork detail view ───────────────────────────────────────────────────────────────────────────────────
   var artworkCurrent = {};
 
   function openArtwork(saleId, title, createdAt, artistUserId, artistUsername) {
@@ -3718,9 +3921,9 @@
     }
   });
 
-  // ── View switching ─────────────────────────────────────────────────────────
+  // ── View switching ──────────────────────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-collections', 'view-artwork'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-feed', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-collections', 'view-artwork'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -3731,6 +3934,7 @@
       }
     });
     document.getElementById('tab-dash').classList.toggle('active', viewId === 'view-dash');
+    document.getElementById('tab-feed').classList.toggle('active', viewId === 'view-feed');
     document.getElementById('tab-ledger').classList.toggle('active', viewId === 'view-ledger');
     document.getElementById('tab-forum').classList.toggle('active', viewId === 'view-forum');
     document.getElementById('tab-messages').classList.toggle('active', viewId === 'view-messages');
@@ -3739,6 +3943,7 @@
 
     var VIEW_TITLES = {
       'view-dash': 'Dashboard',
+      'view-feed': 'Feed',
       'view-ledger': 'Ledger',
       'view-forum': 'Forum',
       'view-messages': 'Messages',
@@ -3752,6 +3957,11 @@
   // ── Tab listeners ──────────────────────────────────────────────────────────
   document.getElementById('tab-dash').addEventListener('click', function () {
     showView('view-dash');
+  });
+
+  document.getElementById('tab-feed').addEventListener('click', function () {
+    showView('view-feed');
+    loadFeed();
   });
 
   document.getElementById('tab-ledger').addEventListener('click', function () {
@@ -4191,7 +4401,7 @@
   }
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
-  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
+  var NAV_PAGES = ['view-dash', 'view-feed', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
   var navCurrentIdx = 0;
 
   function updateMobNav(idx) {
@@ -4224,6 +4434,7 @@
     var viewId = NAV_PAGES[newIdx];
     showView(viewId);
     updateMobNav(newIdx);
+    if (viewId === 'view-feed') loadFeed();
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
@@ -4236,6 +4447,7 @@
     var viewId = NAV_PAGES[newIdx];
     showView(viewId);
     updateMobNav(newIdx);
+    if (viewId === 'view-feed') loadFeed();
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
