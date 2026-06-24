@@ -80,31 +80,31 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper: #141310;
-      --paper-2: #221f17;
-      --ink: #e8e2d5;
-      --ink-2: #9a9080;
-      --accent: #d98c5f;
-      --ok: #74c79a;
-      --line: #2e2a22;
-      --header-bg: rgba(20, 19, 16, 0.88);
-      --pill-join-bg: rgba(116, 199, 154, 0.14);
-      --pill-sale-bg: rgba(217, 140, 95, 0.14);
+      --paper: #0f1013;
+      --paper-2: #181b1f;
+      --ink: #d4d0c8;
+      --ink-2: #7a7870;
+      --accent: #9b7fa8;
+      --ok: #5fa37d;
+      --line: #252830;
+      --header-bg: rgba(15, 16, 19, 0.90);
+      --pill-join-bg: rgba(95, 163, 125, 0.12);
+      --pill-sale-bg: rgba(155, 127, 168, 0.14);
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Hanken Grotesk', system-ui, sans-serif;
     }
 
     html.light {
-      --paper: #fff;
-      --paper-2: #ece6d9;
-      --ink: #1d1b16;
-      --ink-2: #6b6355;
-      --accent: #8a3b2e;
-      --ok: #2f6b4d;
-      --line: #e4ded2;
-      --header-bg: rgba(255, 255, 255, 0.88);
-      --pill-join-bg: rgba(47, 107, 77, 0.12);
-      --pill-sale-bg: rgba(138, 59, 46, 0.12);
+      --paper: #f2f2ef;
+      --paper-2: #e4e3de;
+      --ink: #1a1c20;
+      --ink-2: #5e5e65;
+      --accent: #6b4e7d;
+      --ok: #3d6e57;
+      --line: #d8d7d2;
+      --header-bg: rgba(242, 242, 239, 0.90);
+      --pill-join-bg: rgba(61, 110, 87, 0.12);
+      --pill-sale-bg: rgba(107, 78, 125, 0.14);
     }
 
     html {
@@ -541,7 +541,7 @@
       font-size: 1.6rem;
       font-weight: 700;
       color: #fff;
-      background: linear-gradient(135deg, #7c5cbf, #b89be0);
+      background: linear-gradient(135deg, #2a2338, #4a3658);
     }
     .work-meta { padding: 0.5rem 0.6rem; }
     .work-title {
@@ -552,6 +552,80 @@
     }
     .work-date { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
     .profile-empty { color: var(--ink-2); font-style: italic; margin: 0; }
+    .work-tile { cursor: pointer; }
+    .work-tile:hover .work-thumb { opacity: 0.88; }
+
+    /* ── Artwork detail view ── */
+    .artwork-artist-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .artwork-artist-link:hover { text-decoration: underline; }
+    .artwork-date { color: var(--ink-2); font-size: 0.85rem; margin-top: 0.2rem; }
+
+    .artwork-reactions-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.25rem 0;
+    }
+    .reaction-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.3rem 0.75rem;
+      border: 1px solid var(--line);
+      border-radius: 2rem;
+      background: var(--paper-2);
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--ink);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .reaction-btn:hover { border-color: var(--accent); }
+    .reaction-btn.active {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, var(--paper-2));
+    }
+    .reaction-count { font-size: 0.8rem; color: var(--ink-2); }
+    .reaction-btn.active .reaction-count { color: var(--accent); }
+
+    .comment-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
+    .comment-item { display: flex; flex-direction: column; gap: 0.2rem; }
+    .comment-header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+    .comment-author {
+      font-weight: 600;
+      font-size: 0.85rem;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: inherit;
+    }
+    .comment-author:hover { text-decoration: underline; }
+    .comment-timestamp { font-size: 0.75rem; color: var(--ink-2); }
+    .comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.45; }
+
+    .comment-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+    .comment-form textarea {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      border: 1px solid var(--line);
+      border-radius: 0.4rem;
+      background: var(--paper-2);
+      color: var(--ink);
+      font: inherit;
+      font-size: 0.9rem;
+      resize: vertical;
+      box-sizing: border-box;
+    }
+    .comment-form textarea:focus { outline: none; border-color: var(--accent); }
+    .comment-form-row { display: flex; justify-content: flex-end; }
+    .comment-signin-hint { color: var(--ink-2); font-style: italic; font-size: 0.9rem; margin: 0.5rem 0 0; }
 
     /* ── Stats grid ── */
     .stats-grid {
@@ -1349,10 +1423,10 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      background: #FAF8F4;
+      background: #181b1f;
       border-radius: 9999px;
       padding: 0.6rem 1.1rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.32), 0 1px 4px rgba(0,0,0,0.16);
     }
 
     .mob-nav-item {
@@ -1367,7 +1441,7 @@
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.65rem;
       letter-spacing: 0.07em;
-      color: #555047;
+      color: #7a7870;
       text-transform: uppercase;
       font-weight: 500;
     }
@@ -1404,12 +1478,12 @@
       pointer-events: auto;
     }
     .mob-nav-item-left .mob-nav-arrow-inner {
-      border: 1.5px dashed #555047;
+      border: 1.5px dashed #7a7870;
     }
-    .mob-nav-item-left .mob-nav-label { color: #888; }
+    .mob-nav-item-left .mob-nav-label { color: #5a5a60; }
 
     .mob-nav-item-right .mob-nav-arrow-inner {
-      border: 2px solid #1d1b16;
+      border: 2px solid #d4d0c8;
     }
     .mob-nav-item-right.disabled {
       opacity: 0.38;
@@ -1422,23 +1496,23 @@
       gap: 0.35rem;
       padding: 0.45rem 1.05rem;
       border-radius: 9999px;
-      border: 1px solid #a78bca;
-      background: #FAF8F4;
+      border: 1px solid #9b7fa8;
+      background: #181b1f;
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.82rem;
       font-weight: 500;
-      color: #1d1b16;
+      color: #d4d0c8;
       cursor: pointer;
       letter-spacing: 0.03em;
       transition: background 0.15s;
       text-decoration: none;
     }
-    .mob-nav-menu-btn:hover { background: #f0ece4; }
+    .mob-nav-menu-btn:hover { background: #20242a; }
 
     .mob-nav-divider {
       width: 1px;
       height: 1.75rem;
-      background: #d8d2c6;
+      background: #252830;
       margin: 0 0.1rem;
       flex-shrink: 0;
     }
@@ -2000,6 +2074,29 @@
   </div>
 </div>
 
+<div id="view-artwork" class="view hidden">
+  <button id="artwork-back" class="forum-back" type="button">← Back</button>
+
+  <div class="card">
+    <h1 id="artwork-title" style="margin:0 0 0.25rem;font-size:1.3rem"></h1>
+    <div id="artwork-date" class="artwork-date"></div>
+    <div style="margin-top:0.5rem">
+      <button id="artwork-artist-btn" class="artwork-artist-link" type="button"></button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Reactions</h2>
+    <div id="artwork-reactions" class="artwork-reactions-bar"></div>
+  </div>
+
+  <div class="card">
+    <h2>Comments</h2>
+    <div id="artwork-comments-list" class="comment-list"></div>
+    <div id="artwork-comment-form-wrap"></div>
+  </div>
+</div>
+
 <!-- Mobile bottom navigation -->
 <nav id="mobile-bottom-nav" aria-label="Page navigation">
   <div class="mob-nav-pill">
@@ -2008,7 +2105,7 @@
       <button class="mob-nav-arrow" id="mob-nav-prev-btn" aria-label="Previous page" tabindex="-1">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8.5 3L4.5 7L8.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 3L4.5 7L8.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
@@ -2021,7 +2118,7 @@
     <div class="mob-nav-item">
       <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#9b7fa8" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         </svg>
         Menu
       </a>
@@ -2034,7 +2131,7 @@
       <button class="mob-nav-arrow" id="mob-nav-next-btn" aria-label="Next page">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5.5 3L9.5 7L5.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 3L9.5 7L5.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
@@ -3063,7 +3160,7 @@
         var title = w.title || 'Untitled';
         var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
         var date = formatStamp(w.created_at);
-        return '<div class="work-tile">' +
+        return '<div class="work-tile" data-sale-id="' + esc(String(w.id)) + '" data-sale-title="' + esc(title) + '" data-sale-created="' + esc(String(w.created_at || '')) + '">' +
           '<div class="work-thumb">' + esc(initial) + '</div>' +
           '<div class="work-meta">' +
             '<div class="work-title">' + esc(title) + '</div>' +
@@ -3072,6 +3169,17 @@
         '</div>';
       }).join('') +
     '</div>';
+    el.querySelectorAll('.work-tile').forEach(function (tile) {
+      tile.addEventListener('click', function () {
+        openArtwork(
+          parseInt(tile.dataset.saleId, 10),
+          tile.dataset.saleTitle || '',
+          tile.dataset.saleCreated || '',
+          profileCurrent.userId,
+          profileCurrent.username
+        );
+      });
+    });
   }
 
   function renderProfile(data) {
@@ -3485,11 +3593,134 @@
       submitBtn.disabled = false;
       submitBtn.textContent = 'Create collection';
     });
+
+  // ── Artwork detail view ────────────────────────────────────────────────────
+  var artworkCurrent = {};
+
+  function openArtwork(saleId, title, createdAt, artistUserId, artistUsername) {
+    artworkCurrent = { saleId: saleId, title: title, createdAt: createdAt, artistUserId: artistUserId, artistUsername: artistUsername };
+    showView('view-artwork');
+    document.getElementById('artwork-title').textContent = title || 'Untitled';
+    var dateEl = document.getElementById('artwork-date');
+    var dateStr = createdAt ? formatStamp(createdAt) : '';
+    dateEl.textContent = dateStr ? 'Recorded ' + dateStr : '';
+    var artistBtn = document.getElementById('artwork-artist-btn');
+    artistBtn.textContent = artistUsername || 'Artist';
+    document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2);font-size:0.85rem">Loading…</span>';
+    document.getElementById('artwork-comments-list').innerHTML = '';
+    document.getElementById('artwork-comment-form-wrap').innerHTML = '';
+
+    Promise.all([
+      api('/api/artworks/' + saleId + '/reactions'),
+      api('/api/artworks/' + saleId + '/comments'),
+    ]).then(function (results) {
+      renderArtworkReactions(saleId, results[0]);
+      renderArtworkComments(saleId, results[1]);
+    }).catch(function (err) {
+      console.error('Artwork load error:', err);
+      document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2)">Could not load reactions.</span>';
+    });
+  }
+
+  function renderArtworkReactions(saleId, data) {
+    var counts = (data && data.counts) || {};
+    var myEmoji = (data && data.myEmoji) || null;
+    var emojis = ['❤️', '🔥', '👏', '✨', '🎨'];
+    var el = document.getElementById('artwork-reactions');
+    el.innerHTML = emojis.map(function (emoji) {
+      var count = counts[emoji] || 0;
+      var active = emoji === myEmoji ? ' active' : '';
+      return '<button class="reaction-btn' + active + '" data-emoji="' + esc(emoji) + '">' +
+        emoji + ' <span class="reaction-count">' + count + '</span>' +
+      '</button>';
+    }).join('');
+    el.querySelectorAll('.reaction-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var emoji = btn.dataset.emoji;
+        api('/api/artworks/' + saleId + '/reactions', {
+          method: 'POST',
+          body: JSON.stringify({ emoji: emoji }),
+        }).then(function (res) {
+          renderArtworkReactions(saleId, res);
+        }).catch(function (err) {
+          console.error('Reaction error:', err);
+        });
+      });
+    });
+  }
+
+  function renderArtworkComments(saleId, data) {
+    var comments = (data && data.comments) || [];
+    var listEl = document.getElementById('artwork-comments-list');
+    var formWrap = document.getElementById('artwork-comment-form-wrap');
+
+    if (!comments.length) {
+      listEl.innerHTML = '<p class="profile-empty">No comments yet.</p>';
+    } else {
+      listEl.innerHTML = comments.map(function (c) {
+        return '<div class="comment-item">' +
+          '<div class="comment-header">' +
+            '<button class="comment-author" data-uid="' + esc(String(c.user_id)) + '" data-uname="' + esc(c.username) + '">' + esc(c.username) + '</button>' +
+            '<span class="comment-timestamp">' + esc(formatStamp(c.created_at) || '') + '</span>' +
+          '</div>' +
+          '<div class="comment-body">' + esc(c.body) + '</div>' +
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('.comment-author').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        });
+      });
+    }
+
+    if (currentUserId) {
+      formWrap.innerHTML =
+        '<form class="comment-form" id="artwork-comment-form">' +
+          '<textarea placeholder="Add a comment…" maxlength="500" rows="2" required></textarea>' +
+          '<div class="comment-form-row"><button type="submit">Post</button></div>' +
+        '</form>';
+      document.getElementById('artwork-comment-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var textarea = e.target.querySelector('textarea');
+        var submitBtn = e.target.querySelector('button[type="submit"]');
+        var body = textarea.value.trim();
+        if (!body) return;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting…';
+        api('/api/artworks/' + saleId + '/comments', {
+          method: 'POST',
+          body: JSON.stringify({ body: body }),
+        }).then(function () {
+          textarea.value = '';
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Post';
+          return api('/api/artworks/' + saleId + '/comments');
+        }).then(function (res) {
+          renderArtworkComments(saleId, res);
+        }).catch(function (err) {
+          console.error('Comment error:', err);
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Post';
+        });
+      });
+    } else {
+      formWrap.innerHTML = '<p class="comment-signin-hint">Sign in to comment.</p>';
+    }
+  }
+
+  document.getElementById('artwork-back').addEventListener('click', function () {
+    showView('view-profile');
+  });
+
+  document.getElementById('artwork-artist-btn').addEventListener('click', function () {
+    if (artworkCurrent.artistUserId) {
+      openProfile(artworkCurrent.artistUserId, artworkCurrent.artistUsername);
+    }
   });
 
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-collections'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-collections', 'view-artwork'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
