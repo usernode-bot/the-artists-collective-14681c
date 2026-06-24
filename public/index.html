@@ -167,6 +167,7 @@
       padding: 0.35rem 0.8rem;
       border-radius: 4px;
       cursor: pointer;
+      white-space: nowrap;
       transition: color 0.15s, background 0.15s;
     }
     .tab:hover { color: var(--ink); background: var(--paper-2); }
@@ -284,10 +285,99 @@
       color: var(--ink-2);
     }
 
+    /* ── Welcome panel ── */
+    #view-welcome {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+      gap: 1.5rem;
+    }
+    #view-welcome h1 {
+      font-family: var(--serif);
+      font-size: 2.2rem;
+      font-weight: 400;
+      line-height: 1.2;
+      max-width: 28rem;
+    }
+    .welcome-points {
+      list-style: none;
+      padding: 0;
+      max-width: 24rem;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .welcome-points li {
+      color: var(--ink-2);
+      font-size: 0.95rem;
+      line-height: 1.55;
+      padding-left: 1.4rem;
+      position: relative;
+    }
+    .welcome-points li::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 1.3rem;
+      line-height: 1.2;
+    }
+    #welcome-enter-btn {
+      background: var(--ink);
+      color: var(--paper);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.72rem 1.8rem;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    #welcome-enter-btn:hover { opacity: 0.82; }
+
     #mode-notice {
       font-size: 0.78rem;
       color: var(--ink-2);
       margin-top: -0.25rem;
+    }
+
+    .enrol-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      max-width: 22rem;
+      width: 100%;
+      text-align: left;
+    }
+    .enrol-fields label {
+      font-size: 0.82rem;
+      color: var(--ink-2);
+      display: block;
+      margin-bottom: 0.2rem;
+    }
+    .enrol-fields input[type="text"],
+    .enrol-fields select {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      border: 1.5px solid var(--line);
+      border-radius: 4px;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 0.9rem;
+      box-sizing: border-box;
+    }
+    .enrol-fields input[type="text"]:focus,
+    .enrol-fields select:focus {
+      outline: none;
+      border-color: var(--ink);
     }
 
     /* ── Shared view wrapper ── */
@@ -442,6 +532,44 @@
     }
 
     /* ── Governance ── */
+    .fee-status {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--paper-2);
+      font-size: 0.9rem;
+    }
+    .fee-status-label { color: var(--ink-2); }
+    .fee-status-value {
+      font-family: var(--serif);
+      font-weight: 700;
+      font-size: 1.05rem;
+      color: var(--ink);
+    }
+    .proposal-outcome {
+      margin-left: auto;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.22rem 0.6rem;
+      border-radius: 999px;
+      border: 1px solid var(--ink-2);
+      color: var(--ink-2);
+      white-space: nowrap;
+    }
+    .proposal-outcome.is-passed {
+      color: var(--ok);
+      border-color: var(--ok);
+      background: color-mix(in srgb, var(--ok) 12%, transparent);
+    }
+    .proposal-outcome.is-failed {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+    }
+
     .proposal-title {
       font-family: var(--serif);
       font-size: 1.05rem;
@@ -618,7 +746,7 @@
       margin-bottom: 0.5rem;
       word-break: break-word;
     }
-    .web-access-line a { color: var(--accent); }
+
     .web-access-code {
       font-family: 'Courier New', monospace;
       font-size: 1.05rem;
@@ -1264,6 +1392,7 @@
         gap: 0.5rem;
       }
       .brand { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .header-right { order: 2; }
       /* Hide the tab row on mobile — navigation moves to the bottom pill */
       header nav { display: none; }
       /* Centred current-page title fills the space between brand and controls */
@@ -1311,11 +1440,36 @@
       <li>Return here and click <strong>Enter the studio →</strong> to access your dashboard.</li>
     </ol>
   </div>
+  <div class="enrol-fields">
+    <div>
+      <label for="enrol-display-name">Display name</label>
+      <input type="text" id="enrol-display-name" placeholder="Your display name" maxlength="80" autocomplete="off" />
+    </div>
+    <div>
+      <label for="enrol-gender">Gender</label>
+      <select id="enrol-gender">
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+        <option value="na" selected>Prefer not to say</option>
+      </select>
+    </div>
+  </div>
   <button id="enrol-btn">Create your artist account →</button>
   <button id="enter-btn">Enter the studio →</button>
   <p id="enter-error" class="hidden" style="color:var(--accent);font-size:0.85rem;margin-top:-0.25rem"></p>
   <p id="mode-notice"></p>
   <p class="gate-helper">Already a member? Just tap Enter the studio.</p>
+</div>
+
+<!-- View: Welcome panel (shown once after first enrolment) -->
+<div id="view-welcome" class="view hidden">
+  <h1>You're now a member-owner of The Artists' Collective.</h1>
+  <ul class="welcome-points">
+    <li>You hold an ownership stake in the collective<span id="welcome-tact"></span>.</li>
+    <li>You have full voting rights on governance proposals — one member, one vote.</li>
+    <li>A share of every sale fee funds shared marketing, decided together.</li>
+  </ul>
+  <button id="welcome-enter-btn">Enter the studio →</button>
 </div>
 
 <!-- View: Dashboard -->
@@ -1363,6 +1517,13 @@
     <div class="panel-col">
       <div class="card">
         <h2>Governance</h2>
+        <!-- Fee Split status — static so the badge is always in the DOM (and at
+             /?demo=1) regardless of data load. JS updates it via renderFeeStatus. -->
+        <div class="fee-status">
+          <span class="fee-status-label">Platform fee:</span>
+          <span class="fee-status-value" id="platform-fee-value">20%</span>
+          <span class="proposal-outcome" id="proposal-outcome">Voting open</span>
+        </div>
         <div id="proposals-list"><p class="proposal-desc">Loading…</p></div>
       </div>
       <div class="card">
@@ -1551,7 +1712,11 @@
   var cachedLedger = [];
   var dbSales = [];
   var dbEnrolments = [];
-  var GALLERY_FEE_RATE = 0.10;
+  // The platform fee is governed by the Fee Split proposal (see renderFeeStatus).
+  // Initialised to the default fee and overwritten with the live value from
+  // /api/platform once the dashboard loads, so newly recorded sales use the
+  // governed rate. 0.20 = the 20% default before any vote passes.
+  var GALLERY_FEE_RATE = 0.20;
   var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
 
   // ── Chain-write notice ───────────────────────────────────────────────────────
@@ -1811,6 +1976,33 @@
     document.getElementById('stat-sales-value').textContent = '$' + stats.salesValue.toLocaleString();
   }
 
+  // ── Render: platform fee status ───────────────────────────────────────────
+  // Updates the always-present Fee Split badge + displayed fee from /api/platform.
+  // The badge element is static in the HTML (default "Voting open") so the
+  // .proposal-outcome selector exists even if this never runs / the fetch fails.
+  // Also syncs GALLERY_FEE_RATE so recorded sales use the governed fee.
+  function renderFeeStatus(platform) {
+    if (!platform) return;
+    var feePercent = Number(platform.feePercent);
+    if (!isNaN(feePercent)) {
+      GALLERY_FEE_RATE = feePercent / 100;
+      var valueEl = document.getElementById('platform-fee-value');
+      if (valueEl) valueEl.textContent = feePercent + '%';
+    }
+    var badge = document.getElementById('proposal-outcome');
+    if (!badge) return;
+    badge.classList.remove('is-passed', 'is-failed');
+    if (platform.status === 'passed') {
+      badge.textContent = 'Passed — fee updated to ' + feePercent + '%';
+      badge.classList.add('is-passed');
+    } else if (platform.status === 'failed') {
+      badge.textContent = 'Not passed — fee stays ' + feePercent + '%';
+      badge.classList.add('is-failed');
+    } else {
+      badge.textContent = 'Voting open';
+    }
+  }
+
   // ── Render: proposals ─────────────────────────────────────────────────────
   function renderProposals(proposals) {
     var el = document.getElementById('proposals-list');
@@ -1968,9 +2160,10 @@
       return bridgeSend(userAddr, 1, memo);
     }).then(function (result) {
       if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
-      return api('/api/proposals');
-    }).then(function (data) {
-      renderProposals(data.proposals);
+      return Promise.all([api('/api/proposals'), api('/api/platform')]);
+    }).then(function (results) {
+      renderProposals(results[0].proposals);
+      renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
     }).catch(function (err) {
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
@@ -2451,7 +2644,7 @@
 
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -2513,6 +2706,7 @@
       bridgeGetTxs(),
       fetchArtist(userAddr),
       api('/api/me'),
+      api('/api/platform'),
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
@@ -2522,6 +2716,7 @@
       var me = results[5] || {};
       currentUserId = me.id || 0;
 
+      renderFeeStatus(results[6]);
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
       renderSales(artist.sales || []);
@@ -2533,6 +2728,47 @@
       console.error('Dashboard load error:', err);
     });
   }
+
+  // ── Welcome panel helpers ─────────────────────────────────────────────────
+  // Populate #welcome-tact with the artist's TACT balance (= total sales value).
+  // Falls back to empty string (leaving base text "You hold an ownership stake…")
+  // if TACT is 0 or the fetch fails — which is the normal case for new members.
+  function populateWelcomeTact() {
+    api('/api/sales').then(function (data) {
+      var sales = (data && data.sales) || [];
+      var myAddr = userAddr;
+      var mySales = NATIVE ? sales.filter(function (s) { return s.seller_addr === myAddr; }) : sales;
+      var total = mySales.reduce(function (s, r) { return s + Number(r.amount || 0); }, 0);
+      var el = document.getElementById('welcome-tact');
+      if (el && total > 0) {
+        el.innerHTML = ' — <strong>' + Math.round(total).toLocaleString() + ' TACT</strong>';
+      }
+    }).catch(function () {});
+  }
+
+  function showWelcomePanel() {
+    document.getElementById('site-header').classList.remove('hidden');
+    document.body.classList.add('studio-active');
+    showView('view-welcome');
+    populateWelcomeTact();
+    loadDashboard();
+  }
+
+  function enterStudio() {
+    document.getElementById('site-header').classList.remove('hidden');
+    document.body.classList.add('studio-active');
+    showView('view-dash');
+    updateMobNav(0);
+    loadDashboard();
+  }
+
+  // ── Welcome panel → enter studio ──────────────────────────────────────────
+  document.getElementById('welcome-enter-btn').addEventListener('click', function () {
+    api('/api/enrolments/me/welcome-seen', { method: 'POST' }).catch(function () {});
+    updateMobNav(0);
+    showView('view-dash');
+    // loadDashboard() already running in background — dashboard is ready
+  });
 
   // ── Enter studio ──────────────────────────────────────────────────────────
   document.getElementById('enter-btn').addEventListener('click', function () {
@@ -2557,15 +2793,18 @@
       // loadDashboard swaps in the real portrait once it resolves.
       renderAvatar('');
 
-      // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
-      // just POST and let the DB decide if it's a new enrolment. A new enrolment
-      // gets a best-effort on-chain receipt.
       if (NATIVE) {
+        // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
+        // just POST and let the DB decide if it's a new enrolment. A new enrolment
+        // gets a best-effort on-chain receipt and triggers the welcome panel.
         api('/api/enrolments', {
           method: 'POST',
           body: JSON.stringify({ addr: userAddr }),
         }).then(function (resp) {
-          if (resp && resp.enrolled && resp.enrolment) {
+          var isNew = resp && resp.enrolled && resp.enrolment;
+          var notSeenWelcome = resp && !resp.enrolled && resp.enrolment && !resp.enrolment.has_seen_welcome;
+
+          if (isNew) {
             bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
               if (result && result.hash) {
                 api('/api/enrolments/' + resp.enrolment.id + '/tx', {
@@ -2578,14 +2817,18 @@
               return refreshDashboard();
             }).catch(function () {});
           }
-        }).catch(function () {});
-      }
 
-      document.getElementById('site-header').classList.remove('hidden');
-      document.body.classList.add('studio-active');
-      showView('view-dash');
-      updateMobNav(0);
-      return loadDashboard();
+          if (isNew || notSeenWelcome) {
+            showWelcomePanel();
+          } else {
+            enterStudio();
+          }
+        }).catch(function () {
+          enterStudio();
+        });
+      } else {
+        enterStudio();
+      }
     }).catch(function (err) {
       console.error('Entry error:', err);
       btn.disabled = false;
@@ -2612,9 +2855,14 @@
       var addr = results[0];
       var me = results[1] || {};
       var name = me.username || addr;
+      var displayNameInput = document.getElementById('enrol-display-name');
+      var displayName = (displayNameInput && displayNameInput.value.trim()) || name;
+      var genderSelect = document.getElementById('enrol-gender');
+      var gender = genderSelect ? genderSelect.value : 'na';
       var targetUrl = 'https://artists-collective.pages.dev/join'
         + '?addr=' + encodeURIComponent(addr)
-        + '&name=' + encodeURIComponent(name);
+        + '&name=' + encodeURIComponent(displayName)
+        + '&gender=' + encodeURIComponent(gender);
 
       // sendTransaction resolves only after on-chain confirmation; there is no
       // broadcast callback. Race it against a 10s timeout so the tab opens at
@@ -2723,20 +2971,31 @@
         var loginUrl = data.login_url || 'https://artists-collective.pages.dev/login';
         var uname = data.username || '';
         var code = data.code || '';
+        var magicUrl = data.magic_url || '';
 
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
-            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
-          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
+            '<span class="web-access-url">' + esc(loginUrl) + '</span></p>' +
+          '<p class="web-access-line">Username for the login page: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
+          (magicUrl
+            ? '<p class="web-access-note">Tap <strong>Open in new tab</strong> to sign in instantly, or copy the link and paste it in Safari/Chrome.</p>' +
+              '<p class="web-access-note">If the link has expired, go to the address above and enter the username and code shown here.</p>'
+            : '') +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
-            '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' : '') +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-open-tab">Open in new tab</button>' : '') +
           '</div>' +
-          '<p class="web-access-note">This replaces any code you generated before.</p>';
+          (magicUrl ? '' : '<p class="web-access-note">This replaces any code you generated before.</p>');
 
         bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
-        bindCopyButton(document.getElementById('web-access-copy-link'), loginUrl, 'Copy link');
+        if (magicUrl) {
+          bindCopyButton(document.getElementById('web-access-copy-link'), magicUrl, 'Copy link');
+          document.getElementById('web-access-open-tab').addEventListener('click', function () {
+            window.open(magicUrl, '_blank');
+          });
+        }
 
         resultEl.classList.remove('hidden');
         webAccessBtn.disabled = false;
@@ -2921,9 +3180,15 @@
           document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
           document.getElementById('site-header').classList.remove('hidden');
           document.body.classList.add('studio-active');
-          showView('view-dash');
-          updateMobNav(0);
-          return loadDashboard();
+          if (data.enrolment && !data.enrolment.has_seen_welcome) {
+            showView('view-welcome');
+            populateWelcomeTact();
+            loadDashboard();
+          } else {
+            showView('view-dash');
+            updateMobNav(0);
+            return loadDashboard();
+          }
         }).catch(function (err) {
           console.error('Auto-entry bridge error:', err);
           autoEnrolBtn.disabled = false;
@@ -2949,6 +3214,16 @@
     });
   }
 
+  // Pre-fill display name from username so the artist sees a sensible default.
+  if (TOKEN) {
+    api('/api/me').then(function (me) {
+      if (me && me.username) {
+        var nameInput = document.getElementById('enrol-display-name');
+        if (nameInput && !nameInput.value) nameInput.value = me.username;
+      }
+    }).catch(function () {});
+  }
+
   // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
   // screenshots and proposal checks land on a populated dashboard (which
   // renders from the seeded DB) instead of the gate. No-op without the flag.
@@ -2956,6 +3231,19 @@
     setTimeout(function () {
       var enterBtn = document.getElementById('enter-btn');
       if (enterBtn) enterBtn.click();
+    }, 0);
+  }
+
+  // ?demo=welcome shows the one-time welcome panel with a hardcoded TACT value
+  // so the panel can be tested in staging without a real NATIVE wallet session.
+  if (params.get('demo') === 'welcome') {
+    setTimeout(function () {
+      document.getElementById('site-header').classList.remove('hidden');
+      document.body.classList.add('studio-active');
+      var tactEl = document.getElementById('welcome-tact');
+      if (tactEl) tactEl.innerHTML = ' — <strong>1,500 TACT</strong>';
+      showView('view-welcome');
+      loadDashboard();
     }, 0);
   }
 
