@@ -80,31 +80,31 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper: #141310;
-      --paper-2: #221f17;
-      --ink: #e8e2d5;
-      --ink-2: #9a9080;
-      --accent: #d98c5f;
-      --ok: #74c79a;
-      --line: #2e2a22;
-      --header-bg: rgba(20, 19, 16, 0.88);
-      --pill-join-bg: rgba(116, 199, 154, 0.14);
-      --pill-sale-bg: rgba(217, 140, 95, 0.14);
+      --paper: #0f1013;
+      --paper-2: #181b1f;
+      --ink: #d4d0c8;
+      --ink-2: #7a7870;
+      --accent: #9b7fa8;
+      --ok: #5fa37d;
+      --line: #252830;
+      --header-bg: rgba(15, 16, 19, 0.90);
+      --pill-join-bg: rgba(95, 163, 125, 0.12);
+      --pill-sale-bg: rgba(155, 127, 168, 0.14);
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Hanken Grotesk', system-ui, sans-serif;
     }
 
     html.light {
-      --paper: #fff;
-      --paper-2: #ece6d9;
-      --ink: #1d1b16;
-      --ink-2: #6b6355;
-      --accent: #8a3b2e;
-      --ok: #2f6b4d;
-      --line: #e4ded2;
-      --header-bg: rgba(255, 255, 255, 0.88);
-      --pill-join-bg: rgba(47, 107, 77, 0.12);
-      --pill-sale-bg: rgba(138, 59, 46, 0.12);
+      --paper: #f2f2ef;
+      --paper-2: #e4e3de;
+      --ink: #1a1c20;
+      --ink-2: #5e5e65;
+      --accent: #6b4e7d;
+      --ok: #3d6e57;
+      --line: #d8d7d2;
+      --header-bg: rgba(242, 242, 239, 0.90);
+      --pill-join-bg: rgba(61, 110, 87, 0.12);
+      --pill-sale-bg: rgba(107, 78, 125, 0.14);
     }
 
     html {
@@ -541,7 +541,7 @@
       font-size: 1.6rem;
       font-weight: 700;
       color: #fff;
-      background: linear-gradient(135deg, #7c5cbf, #b89be0);
+      background: linear-gradient(135deg, #2a2338, #4a3658);
     }
     .work-meta { padding: 0.5rem 0.6rem; }
     .work-title {
@@ -1349,10 +1349,10 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      background: #FAF8F4;
+      background: #181b1f;
       border-radius: 9999px;
       padding: 0.6rem 1.1rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.32), 0 1px 4px rgba(0,0,0,0.16);
     }
 
     .mob-nav-item {
@@ -1367,7 +1367,7 @@
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.65rem;
       letter-spacing: 0.07em;
-      color: #555047;
+      color: #7a7870;
       text-transform: uppercase;
       font-weight: 500;
     }
@@ -1404,12 +1404,12 @@
       pointer-events: auto;
     }
     .mob-nav-item-left .mob-nav-arrow-inner {
-      border: 1.5px dashed #555047;
+      border: 1.5px dashed #7a7870;
     }
-    .mob-nav-item-left .mob-nav-label { color: #888; }
+    .mob-nav-item-left .mob-nav-label { color: #5a5a60; }
 
     .mob-nav-item-right .mob-nav-arrow-inner {
-      border: 2px solid #1d1b16;
+      border: 2px solid #d4d0c8;
     }
     .mob-nav-item-right.disabled {
       opacity: 0.38;
@@ -1422,23 +1422,23 @@
       gap: 0.35rem;
       padding: 0.45rem 1.05rem;
       border-radius: 9999px;
-      border: 1px solid #a78bca;
-      background: #FAF8F4;
+      border: 1px solid #9b7fa8;
+      background: #181b1f;
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.82rem;
       font-weight: 500;
-      color: #1d1b16;
+      color: #d4d0c8;
       cursor: pointer;
       letter-spacing: 0.03em;
       transition: background 0.15s;
       text-decoration: none;
     }
-    .mob-nav-menu-btn:hover { background: #f0ece4; }
+    .mob-nav-menu-btn:hover { background: #20242a; }
 
     .mob-nav-divider {
       width: 1px;
       height: 1.75rem;
-      background: #d8d2c6;
+      background: #252830;
       margin: 0 0.1rem;
       flex-shrink: 0;
     }
@@ -1776,7 +1776,7 @@
       <button class="mob-nav-arrow" id="mob-nav-prev-btn" aria-label="Previous page" tabindex="-1">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8.5 3L4.5 7L8.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 3L4.5 7L8.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
@@ -1789,7 +1789,7 @@
     <div class="mob-nav-item">
       <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#9b7fa8" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         </svg>
         Menu
       </a>
@@ -1802,7 +1802,7 @@
       <button class="mob-nav-arrow" id="mob-nav-next-btn" aria-label="Next page">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5.5 3L9.5 7L5.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 3L9.5 7L5.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
