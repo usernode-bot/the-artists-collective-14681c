@@ -37,6 +37,9 @@
     { "name": "Mobile header title renders", "path": "/?demo=1", "expectSelector": "#mob-header-title" },
     { "name": "Profile view renders", "path": "/?demo=1", "expectSelector": "#view-profile" },
     { "name": "Welcome panel renders", "path": "/?demo=welcome", "expectSelector": "#view-welcome" },
-    { "name": "Fee Split outcome badge renders", "path": "/?demo=1", "expectSelector": ".proposal-outcome" }
+    { "name": "Fee Split outcome badge renders", "path": "/?demo=1", "expectSelector": ".proposal-outcome" },
+    { "name": "Feed tab renders", "path": "/?demo=1", "expectSelector": "#tab-feed" },
+    { "name": "Feed view renders", "path": "/?demo=1", "expectSelector": "#view-feed" },
+    { "name": "Profile follow button renders", "path": "/?demo=1", "expectSelector": "#profile-follow-btn" }
   ]
 }

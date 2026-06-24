@@ -511,10 +511,119 @@ app.get('/api/artists/:id', async (req, res) => {
       [uid]
     );
 
+    // Follow stats: counts on both sides plus whether the viewer follows this
+    // artist. follows is public; this is a query-time read, not an FK.
+    const followRes = await pool.query(
+      `SELECT
+         (SELECT COUNT(*)::int FROM follows WHERE followee_id = $1) AS follower_count,
+         (SELECT COUNT(*)::int FROM follows WHERE follower_id = $1) AS following_count,
+         EXISTS (SELECT 1 FROM follows WHERE follower_id = $2 AND followee_id = $1) AS is_following`,
+      [uid, req.user.id]
+    );
+    const f = followRes.rows[0] || { follower_count: 0, following_count: 0, is_following: false };
+
     res.json({
-      artist: { user_id: uid, username, addr, bio, enrolled },
+      artist: {
+        user_id: uid, username, addr, bio, enrolled,
+        follower_count: f.follower_count,
+        following_count: f.following_count,
+        is_following: f.is_following,
+      },
       works: worksRes.rows,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Followers / following lists for an artist's profile. Public social graph;
+//    each row is { user_id, username } drawn from the relevant side of follows. ─
+app.get('/api/artists/:id/followers', async (req, res) => {
+  const uid = parseInt(req.params.id, 10);
+  if (!uid) return res.status(400).json({ error: 'Invalid artist id' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT follower_id AS user_id, follower_username AS username
+       FROM follows WHERE followee_id = $1 ORDER BY created_at DESC, id DESC`,
+      [uid]
+    );
+    res.json({ followers: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/artists/:id/following', async (req, res) => {
+  const uid = parseInt(req.params.id, 10);
+  if (!uid) return res.status(400).json({ error: 'Invalid artist id' });
+  try {
+    const { rows } = await pool.query(
+      `SELECT followee_id AS user_id, followee_username AS username
+       FROM follows WHERE follower_id = $1 ORDER BY created_at DESC, id DESC`,
+      [uid]
+    );
+    res.json({ following: rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Follow / unfollow ─────────────────────────────────────────────────────────
+// follows is a public social graph (who-follows-whom is in-app-visible content,
+// like the ownership roster and forum). usernames are denormalized, mirroring
+// the rest of the app; there is no FK to a private table.
+app.post('/api/follows', async (req, res) => {
+  const followeeId = parseInt((req.body && req.body.followee_id) || 0, 10);
+  const followeeUsername = String((req.body && req.body.followee_username) || '').trim();
+  if (!followeeId || followeeId === req.user.id) {
+    return res.status(400).json({ error: 'Invalid follow target' });
+  }
+  if (!followeeUsername) {
+    return res.status(400).json({ error: 'Missing followee_username' });
+  }
+  try {
+    await pool.query(
+      `INSERT INTO follows (follower_id, follower_username, followee_id, followee_username)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (follower_id, followee_id) DO NOTHING`,
+      [req.user.id, req.user.username, followeeId, followeeUsername.slice(0, 255)]
+    );
+    res.json({ ok: true, following: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/follows/:followeeId', async (req, res) => {
+  const followeeId = parseInt(req.params.followeeId, 10);
+  if (!followeeId) return res.status(400).json({ error: 'Invalid follow target' });
+  try {
+    await pool.query(
+      `DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`,
+      [req.user.id, followeeId]
+    );
+    res.json({ ok: true, following: false });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Personalized feed ─────────────────────────────────────────────────────────
+// Latest works from the artists the viewer follows. Works are sales rows; only
+// title/date/author are selected — amounts/fees are deliberately omitted so no
+// financial data leaves the server (matching the profile works showcase).
+app.get('/api/feed', async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT s.user_id, s.username, s.title, s.created_at
+       FROM follows f
+       JOIN sales s ON s.user_id = f.followee_id
+       WHERE f.follower_id = $1
+       ORDER BY s.created_at DESC, s.id DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+    res.json({ items: rows });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -829,6 +938,28 @@ async function start() {
   // no public→private FK is introduced.
   await pool.query(`ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS bio TEXT`);
 
+  // Follows: social graph (who-follows-whom). Public — this is in-app-visible
+  // content like the ownership roster and forum, not sensitive, so NO
+  // 'staging:private' comment. usernames are denormalized (mirroring votes /
+  // forum / dm tables); there is no FK to a private table, so the public→private
+  // FK linter rule is satisfied (the feed reads sales via a query-time JOIN).
+  // UNIQUE(follower_id, followee_id) makes a follow idempotent; the CHECK blocks
+  // self-follows.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS follows (
+      id SERIAL PRIMARY KEY,
+      follower_id INTEGER NOT NULL,
+      follower_username VARCHAR(255) NOT NULL,
+      followee_id INTEGER NOT NULL,
+      followee_username VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (follower_id, followee_id),
+      CHECK (follower_id <> followee_id)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS follows_follower_idx ON follows (follower_id)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS follows_followee_idx ON follows (followee_id)`);
+
   // Forum: discussion board for the collective. Public — every member reads
   // the board in-app (no auth/financial/personal data), so NO 'staging:private'
   // comment: these tables replicate to staging normally. forum_replies →
@@ -1085,6 +1216,27 @@ async function start() {
         ON CONFLICT (id) DO NOTHING
       `, [id, uid, uname, addr, title, amount, fee]);
     }
+
+    // Seed follow edges among the demo artists so follower/following counts and
+    // lists render populated on their profiles. follows is a newly-created table
+    // (empty in staging). Fixed ids + ON CONFLICT DO NOTHING keep it idempotent.
+    // [id, follower_id, follower_username, followee_id, followee_username]
+    const mockFollows = [
+      [900001, 9001, 'staging-artist-1', 9002, 'staging-artist-2'],
+      [900002, 9001, 'staging-artist-1', 9003, 'staging-artist-3'],
+      [900003, 9002, 'staging-artist-2', 9001, 'staging-artist-1'],
+      [900004, 9003, 'staging-artist-3', 9001, 'staging-artist-1'],
+      [900005, 9003, 'staging-artist-3', 9004, 'staging-artist-4'],
+      [900006, 9004, 'staging-artist-4', 9001, 'staging-artist-1'],
+    ];
+    for (const [id, fId, fName, tId, tName] of mockFollows) {
+      await pool.query(`
+        INSERT INTO follows (id, follower_id, follower_username, followee_id, followee_username)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (follower_id, followee_id) DO NOTHING
+      `, [id, fId, fName, tId, tName]);
+    }
+    await pool.query(`SELECT setval(pg_get_serial_sequence('follows', 'id'), GREATEST((SELECT MAX(id) FROM follows), 1))`);
 
     // Seed DM conversations and messages (both tables are staging:private — empty in staging).
     // Two conversations for staging-artist-1 (uid 9001) so the Messages tab
