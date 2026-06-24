@@ -148,7 +148,7 @@ app.post('/api/web-access-code', async (req, res) => {
   // testable end-to-end. Strict no-op in production.
   if (IS_STAGING) {
     console.log('[web-access-code] staging stub for', username);
-    return res.json({ ok: true, code: '024680', username, login_url: WEB_ACCESS_LOGIN_URL });
+    return res.json({ ok: true, code: '024680', username, login_url: WEB_ACCESS_LOGIN_URL, magic_url: WEB_ACCESS_LOGIN_URL + '?magic=staging-demo-token' });
   }
 
   const key = process.env.WEB_ACCESS_KEY;
@@ -184,6 +184,7 @@ app.post('/api/web-access-code', async (req, res) => {
       code: data.code,
       username: data.username || username,
       login_url: data.login_url || WEB_ACCESS_LOGIN_URL,
+      magic_url: data.magic_url || null,
     });
   } catch (err) {
     console.warn('[web-access-code] request failed:', err.message);
@@ -503,6 +504,80 @@ app.post('/api/enrolments/:id/tx', async (req, res) => {
   }
 });
 
+// ── Artist profiles ──────────────────────────────────────────────────────────
+// A profile is keyed by user_id. Identity + bio come from the enrolments roster;
+// the works gallery is derived from the artist's sales rows (each sale's title is
+// a work — amounts are intentionally omitted so the page reads as a showcase, not
+// a finance view). Non-enrolled authors (e.g. the forum house account) still
+// resolve to a name-only profile rather than 404/500.
+app.get('/api/artists/:id', async (req, res) => {
+  const uid = parseInt(req.params.id, 10);
+  if (!uid) return res.status(400).json({ error: 'Invalid artist id' });
+  try {
+    const enrolRes = await pool.query(
+      `SELECT username, addr, bio FROM enrolments WHERE user_id = $1 LIMIT 1`,
+      [uid]
+    );
+
+    let username;
+    let addr = null;
+    let bio = null;
+    let enrolled = false;
+
+    if (enrolRes.rows.length) {
+      const e = enrolRes.rows[0];
+      username = e.username;
+      addr = e.addr;
+      bio = e.bio;
+      enrolled = true;
+    } else {
+      // Fall back to the most recent name this user appears under in-app, then
+      // to a client-passed hint, then to a neutral placeholder.
+      const nameRes = await pool.query(
+        `SELECT username FROM (
+           SELECT username, created_at FROM sales WHERE user_id = $1
+           UNION ALL
+           SELECT username, created_at FROM forum_threads WHERE user_id = $1
+           UNION ALL
+           SELECT username, created_at FROM forum_replies WHERE user_id = $1
+         ) t ORDER BY created_at DESC LIMIT 1`,
+        [uid]
+      );
+      username = (nameRes.rows[0] && nameRes.rows[0].username)
+        || (req.query.username && String(req.query.username).slice(0, 255))
+        || 'Unknown artist';
+    }
+
+    const worksRes = await pool.query(
+      `SELECT title, created_at FROM sales WHERE user_id = $1 ORDER BY created_at DESC, id DESC`,
+      [uid]
+    );
+
+    res.json({
+      artist: { user_id: uid, username, addr, bio, enrolled },
+      works: worksRes.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artists/me/bio', async (req, res) => {
+  const bio = String((req.body && req.body.bio) || '').trim().slice(0, 1000);
+  try {
+    const { rows } = await pool.query(
+      `UPDATE enrolments SET bio = $1 WHERE user_id = $2 RETURNING id`,
+      [bio, req.user.id]
+    );
+    if (!rows.length) {
+      return res.status(400).json({ error: 'Enrol before editing your profile' });
+    }
+    res.json({ ok: true, bio });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Forum (public discussion board; pure DB-backed, no on-chain component). ───
 app.get('/api/threads', async (_req, res) => {
   try {
@@ -806,6 +881,10 @@ async function start() {
   // rows so pre-deploy members are not shown a retroactive welcome panel.
   await pool.query(`ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS has_seen_welcome BOOLEAN NOT NULL DEFAULT FALSE`);
   await pool.query(`UPDATE enrolments SET has_seen_welcome = TRUE WHERE has_seen_welcome = FALSE`);
+  // bio: free-text artist introduction shown on the public profile page. Public
+  // profile content (enrolments stays public — no staging:private comment), so
+  // no public→private FK is introduced.
+  await pool.query(`ALTER TABLE enrolments ADD COLUMN IF NOT EXISTS bio TEXT`);
 
   // Forum: discussion board for the collective. Public — every member reads
   // the board in-app (no auth/financial/personal data), so NO 'staging:private'
@@ -1034,11 +1113,27 @@ async function start() {
       `, [id, uid, uname, addr]);
     }
 
+    // Seed bios on the demo artists so their profile pages render populated.
+    const mockBios = [
+      [9001, 'Staging demo — Painter of coastal light and slow tides. Mostly oils.'],
+      [9002, 'Staging demo — Abstract colourist exploring blues and greens.'],
+      [9003, 'Staging demo — Printmaker and illustrator; loves a newcomers wall.'],
+      [9004, 'Staging demo — Sculptor working in reclaimed materials.'],
+    ];
+    for (const [uid, bio] of mockBios) {
+      await pool.query(`UPDATE enrolments SET bio = $1 WHERE user_id = $2`, [bio, uid]);
+    }
+
     // Seed a few sales so Treasury / Your sales / stats render populated.
+    // staging-artist-1 (9001) gets three; artists 2 and 3 get works too so more
+    // than one profile gallery renders populated in staging.
     const mockSales = [
       [900001, 9001, 'staging-artist-1', 'ut1stg1abc', 'Staging demo — Autumn Light #1', 450, 45],
       [900002, 9001, 'staging-artist-1', 'ut1stg1abc', 'Staging demo — Blue Resonance #7', 280, 28],
       [900003, 9001, 'staging-artist-1', 'ut1stg1abc', 'Staging demo — Quiet Tide #3', 620, 62],
+      [900004, 9002, 'staging-artist-2', 'ut1stg2def', 'Staging demo — Green Field Study', 320, 32],
+      [900005, 9002, 'staging-artist-2', 'ut1stg2def', 'Staging demo — Cerulean Drift', 540, 54],
+      [900006, 9003, 'staging-artist-3', 'ut1stg3ghi', 'Staging demo — Newcomers Print I', 200, 20],
     ];
     for (const [id, uid, uname, addr, title, amount, fee] of mockSales) {
       await pool.query(`

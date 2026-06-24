@@ -164,6 +164,7 @@
       padding: 0.35rem 0.8rem;
       border-radius: 4px;
       cursor: pointer;
+      white-space: nowrap;
       transition: color 0.15s, background 0.15s;
     }
     .tab:hover { color: var(--ink); background: var(--paper-2); }
@@ -470,6 +471,84 @@
       font-size: 0.8rem;
       margin-top: 0.4rem;
     }
+    #avatar { cursor: pointer; }
+
+    /* ── Artist profile ── */
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 1.1rem;
+      margin: 0.75rem 0 1.25rem;
+    }
+    .profile-avatar { width: 5rem; height: 5rem; cursor: default; }
+    .profile-id-text h1 { margin: 0 0 0.2rem; }
+    #profile-addr { margin: 0 0 0.5rem; }
+    .profile-actions { display: flex; gap: 0.5rem; }
+    .profile-msg-btn {
+      font: inherit;
+      font-size: 0.82rem;
+      color: var(--accent);
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: 999px;
+      padding: 0.3rem 0.9rem;
+      cursor: pointer;
+    }
+    .profile-msg-btn:hover:not(:disabled) { opacity: 0.82; }
+    .profile-bio { margin: 0; white-space: pre-wrap; line-height: 1.5; }
+    .profile-bio.is-empty { color: var(--ink-2); font-style: italic; }
+    #profile-bio-form textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font: inherit;
+      padding: 0.5rem 0.65rem;
+      border-radius: 0.5rem;
+      border: 1px solid var(--line);
+      background: var(--paper);
+      color: var(--ink);
+      resize: vertical;
+    }
+    .profile-bio-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
+    .profile-bio-cancel {
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 0.35rem 0.9rem;
+      cursor: pointer;
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    .profile-works-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .work-tile {
+      border: 1px solid var(--line);
+      border-radius: 0.6rem;
+      overflow: hidden;
+      background: var(--paper-2);
+    }
+    .work-thumb {
+      height: 96px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #7c5cbf, #b89be0);
+    }
+    .work-meta { padding: 0.5rem 0.6rem; }
+    .work-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--ink);
+      word-break: break-word;
+    }
+    .work-date { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
+    .profile-empty { color: var(--ink-2); font-style: italic; margin: 0; }
 
     /* ── Stats grid ── */
     .stats-grid {
@@ -760,7 +839,7 @@
       margin-bottom: 0.5rem;
       word-break: break-word;
     }
-    .web-access-line a { color: var(--accent); }
+
     .web-access-code {
       font-family: 'Courier New', monospace;
       font-size: 1.05rem;
@@ -853,6 +932,19 @@
 
     .own-addr { font-family: 'Courier New', monospace; }
     .own-pct { font-weight: 600; color: var(--ink); }
+    .own-name { font-weight: 600; color: var(--ink); }
+    button.own-name {
+      background: transparent;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+    }
+    button.own-name:hover { color: var(--accent); text-decoration-color: var(--accent); }
+    .own-addr-sub { font-size: 0.7rem; color: var(--ink-2); margin: 0.1rem 0 0.3rem; }
 
     .own-bar-wrap {
       height: 5px;
@@ -1406,9 +1498,10 @@
         gap: 0.4rem;
       }
       .brand { flex: 1; }
+      .header-right { order: 2; }
       header nav {
-        flex-basis: 100%;
-        flex: none;
+        order: 3;
+        flex: 0 0 100%;
         overflow-x: auto;
         flex-wrap: nowrap;
         -webkit-overflow-scrolling: touch;
@@ -1646,6 +1739,42 @@
     <button id="web-access-btn" type="button">Get desktop access code</button>
     <div id="web-access-result" class="hidden"></div>
     <p id="web-access-error" class="hidden"></p>
+  </div>
+</div>
+
+<!-- View: Artist profile (reached by clicking a name/avatar; not a top-level tab) -->
+<div id="view-profile" class="view hidden">
+  <button id="profile-back" class="forum-back" type="button">← Back</button>
+  <div class="profile-header">
+    <div class="avatar profile-avatar" id="profile-avatar">
+      <span class="avatar-initials" id="profile-avatar-initials">·</span>
+      <img class="avatar-img" id="profile-avatar-img" alt="Artist profile picture" />
+    </div>
+    <div class="profile-id-text">
+      <h1 id="profile-name">Artist</h1>
+      <p class="subtitle mono" id="profile-addr"></p>
+      <div class="profile-actions">
+        <button id="profile-message-btn" class="profile-msg-btn hidden" type="button">Message</button>
+        <button id="profile-edit-bio-btn" class="profile-msg-btn hidden" type="button">Edit bio</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Bio</h2>
+    <p id="profile-bio" class="profile-bio">No bio yet.</p>
+    <form id="profile-bio-form" class="hidden" autocomplete="off">
+      <textarea id="profile-bio-input" placeholder="Tell the collective about yourself and your work…" maxlength="1000" rows="4"></textarea>
+      <div class="profile-bio-actions">
+        <button type="submit">Save bio</button>
+        <button type="button" id="profile-bio-cancel" class="profile-bio-cancel">Cancel</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Works</h2>
+    <div id="profile-works"></div>
   </div>
 </div>
 
@@ -2114,12 +2243,18 @@
   function renderOwnership(enrolments) {
     var el = document.getElementById('ownership-bars');
     var seen = [];
+    var byAddr = {};
     enrolments.forEach(function (row) {
-      if (row.addr && seen.indexOf(row.addr) === -1) seen.push(row.addr);
+      if (row.addr && seen.indexOf(row.addr) === -1) {
+        seen.push(row.addr);
+        byAddr[row.addr] = { user_id: row.user_id, username: row.username };
+      }
     });
     var n = Math.max(1, seen.length);
     var pct = Math.round(100 / n);
-    var artists = seen.map(function (addr) { return { addr: addr, pct: pct }; });
+    var artists = seen.map(function (addr) {
+      return { addr: addr, pct: pct, user_id: byAddr[addr].user_id, username: byAddr[addr].username };
+    });
 
     if (!artists.length) {
       el.innerHTML = '<p class="sales-empty">No artists enrolled yet.</p>';
@@ -2128,15 +2263,25 @@
 
     el.innerHTML = '<div class="ownership-bars">' +
       artists.map(function (a) {
+        var label = a.user_id
+          ? '<button class="dm-author-link own-name" data-uid="' + a.user_id + '" data-uname="' + esc(a.username || '') + '">' + esc(a.username || truncAddr(a.addr)) + '</button>'
+          : '<span class="own-name">' + esc(a.username || truncAddr(a.addr)) + '</span>';
         return '<div class="own-row">' +
           '<div class="own-label-row">' +
-            '<span class="own-addr">' + truncAddr(a.addr) + '</span>' +
+            label +
             '<span class="own-pct">' + a.pct + '%</span>' +
           '</div>' +
+          '<div class="own-addr-sub mono">' + esc(truncAddr(a.addr)) + '</div>' +
           '<div class="own-bar-wrap"><div class="own-bar-fill" style="width:' + a.pct + '%"></div></div>' +
         '</div>';
       }).join('') +
     '</div>';
+
+    el.querySelectorAll('.own-name[data-uid]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+      });
+    });
   }
 
   // ── Render: ledger ────────────────────────────────────────────────────────
@@ -2313,7 +2458,7 @@
     el.innerHTML = threads.map(function (t) {
       var count = t.reply_count || 0;
       var replyLabel = count === 1 ? '1 reply' : count + ' replies';
-      var authorHtml = (t.user_id && currentUserId && t.user_id !== currentUserId)
+      var authorHtml = t.user_id
         ? '<button class="dm-author-link thread-author" data-uid="' + t.user_id + '" data-uname="' + esc(t.username) + '">' + esc(t.username) + '</button>'
         : '<span class="thread-author">' + esc(t.username) + '</span>';
       return '<div class="thread-row" data-id="' + t.id + '">' +
@@ -2335,7 +2480,7 @@
     el.querySelectorAll('.dm-author-link').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
       });
     });
   }
@@ -2351,9 +2496,8 @@
   }
 
   function renderPost(author, uid, ts, body, isOp) {
-    var isOwn = uid && currentUserId && uid === currentUserId;
     var authorHtml;
-    if (isOwn || !uid) {
+    if (!uid) {
       authorHtml = '<span class="post-author">' + esc(author) + '</span>';
     } else {
       authorHtml = '<button class="dm-author-link" data-uid="' + uid + '" data-uname="' + esc(author) + '">' + esc(author) + '</button>';
@@ -2389,7 +2533,7 @@
 
     el.querySelectorAll('.dm-author-link').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
       });
     });
 
@@ -2517,7 +2661,7 @@
       var raw = c.last_message_body || '';
       var preview = raw ? (raw.length > 60 ? esc(raw.slice(0, 60)) + '…' : esc(raw)) : '<em>No messages yet</em>';
       var hasUnread = c.unread_count > 0;
-      return '<div class="dm-conv-row' + (hasUnread ? ' has-unread' : '') + '" data-id="' + c.id + '" data-uname="' + esc(c.other_username) + '">' +
+      return '<div class="dm-conv-row' + (hasUnread ? ' has-unread' : '') + '" data-id="' + c.id + '" data-uid="' + (c.other_id || '') + '" data-uname="' + esc(c.other_username) + '">' +
         '<div class="dm-conv-left">' +
           '<div class="dm-conv-username">' + esc(c.other_username) + '</div>' +
           '<div class="dm-conv-preview">' + preview + '</div>' +
@@ -2531,27 +2675,37 @@
 
     el.querySelectorAll('.dm-conv-row').forEach(function (row) {
       row.addEventListener('click', function () {
-        openDmConversation(parseInt(row.dataset.id, 10), row.dataset.uname);
+        openDmConversation(parseInt(row.dataset.id, 10), row.dataset.uname, parseInt(row.dataset.uid, 10) || 0);
       });
     });
   }
 
-  function openDmConversation(convId, otherUsername) {
+  function openDmConversation(convId, otherUsername, otherId) {
     currentDmConvId = convId;
     showDmThread();
     var el = document.getElementById('dm-thread-detail');
     el.innerHTML = '<p class="dm-empty">Loading…</p>';
     return api('/api/dm/conversations/' + convId + '/messages').then(function (data) {
-      renderDmThread(convId, otherUsername, (data && data.messages) || []);
+      renderDmThread(convId, otherUsername, (data && data.messages) || [], otherId);
       loadDmUnreadCount();
     }).catch(function () {
       el.innerHTML = '<p class="dm-empty">Could not load this conversation. Please try again.</p>';
     });
   }
 
-  function renderDmThread(convId, otherUsername, messages) {
+  function renderDmThread(convId, otherUsername, messages, otherId) {
     var el = document.getElementById('dm-thread-detail');
-    var html = '<div class="dm-thread-header">Conversation with ' + esc(otherUsername) + '</div>';
+    // The other person's id may be passed in, or inferred from the first
+    // incoming message — used to make their name link to their profile.
+    if (!otherId) {
+      for (var i = 0; i < messages.length; i++) {
+        if (messages[i].sender_id && messages[i].sender_id !== currentUserId) { otherId = messages[i].sender_id; break; }
+      }
+    }
+    var headerName = otherId
+      ? '<button class="dm-author-link" data-uid="' + otherId + '" data-uname="' + esc(otherUsername) + '">' + esc(otherUsername) + '</button>'
+      : esc(otherUsername);
+    var html = '<div class="dm-thread-header">Conversation with ' + headerName + '</div>';
     html += '<div class="dm-messages">';
     if (messages.length) {
       messages.forEach(function (m) {
@@ -2561,7 +2715,10 @@
         if (isOwn) {
           html += esc(formatStamp(m.created_at));
         } else {
-          html += '<span class="dm-msg-username">' + esc(m.sender_username) + '</span> · ' + esc(formatStamp(m.created_at));
+          var nameHtml = m.sender_id
+            ? '<button class="dm-author-link dm-msg-username" data-uid="' + m.sender_id + '" data-uname="' + esc(m.sender_username) + '">' + esc(m.sender_username) + '</button>'
+            : '<span class="dm-msg-username">' + esc(m.sender_username) + '</span>';
+          html += nameHtml + ' · ' + esc(formatStamp(m.created_at));
         }
         html += '</div>' +
           '<div class="dm-msg-bubble">' + esc(m.body) + '</div>' +
@@ -2579,6 +2736,12 @@
 
     el.innerHTML = html;
 
+    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+      });
+    });
+
     document.getElementById('dm-reply-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var bodyInput = document.getElementById('dm-reply-body');
@@ -2592,7 +2755,7 @@
         body: JSON.stringify({ body: body }),
       }).then(function () {
         bodyInput.value = '';
-        return openDmConversation(convId, otherUsername);
+        return openDmConversation(convId, otherUsername, otherId);
       }).catch(function (err) {
         console.error('DM send error:', err);
         submitBtn.disabled = false;
@@ -2610,7 +2773,7 @@
       body: JSON.stringify({ recipient_id: uid, recipient_username: username }),
     }).then(function (data) {
       if (data && data.conversation) {
-        openDmConversation(data.conversation.id, username);
+        openDmConversation(data.conversation.id, username, uid);
       }
     }).catch(function (err) {
       console.error('startDmWith error:', err);
@@ -2663,7 +2826,7 @@
         document.getElementById('dm-new-form-wrap').style.display = 'none';
         btn.disabled = false;
         btn.textContent = 'Send';
-        return openDmConversation(convId, recip.username);
+        return openDmConversation(convId, recip.username, recip.id);
       });
     }).catch(function (err) {
       console.error('New DM error:', err);
@@ -2677,9 +2840,172 @@
     loadDmConversations();
   });
 
+  // ── Artist profile ─────────────────────────────────────────────────────────
+  // Reached by clicking a name/avatar anywhere in the app. Not a top-level tab:
+  // a static #view-profile div is shown via showView, with a "← Back" button
+  // that restores whichever view the visitor came from.
+  var profilePrevView = 'view-dash';
+  var profileCurrent = null; // { userId, username, addr }
+
+  function viewIdForActiveTab() {
+    // Best-effort "where am I" for Back: the currently-visible non-profile view.
+    var ids = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el && !el.classList.contains('hidden')) return ids[i];
+    }
+    return 'view-dash';
+  }
+
+  function renderProfileWorks(works) {
+    var el = document.getElementById('profile-works');
+    if (!works || !works.length) {
+      el.innerHTML = '<p class="profile-empty">No works recorded yet.</p>';
+      return;
+    }
+    el.innerHTML = '<div class="profile-works-grid">' +
+      works.map(function (w) {
+        var title = w.title || 'Untitled';
+        var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
+        var date = formatStamp(w.created_at);
+        return '<div class="work-tile">' +
+          '<div class="work-thumb">' + esc(initial) + '</div>' +
+          '<div class="work-meta">' +
+            '<div class="work-title">' + esc(title) + '</div>' +
+            (date ? '<div class="work-date">' + esc(date) + '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }
+
+  function renderProfile(data) {
+    var artist = (data && data.artist) || {};
+    var works = (data && data.works) || [];
+    var isOwn = artist.user_id && currentUserId && artist.user_id === currentUserId;
+    profileCurrent = { userId: artist.user_id, username: artist.username, addr: artist.addr };
+
+    document.getElementById('profile-name').textContent = artist.username || 'Artist';
+    document.getElementById('profile-addr').textContent = artist.addr ? truncAddr(artist.addr) : '';
+
+    // Avatar: initials from the addr (or name), then swap in the portrait if the
+    // artist website has one. Mirrors the dashboard avatar behaviour.
+    var avEl = document.getElementById('profile-avatar');
+    var avImg = document.getElementById('profile-avatar-img');
+    var avInit = document.getElementById('profile-avatar-initials');
+    avEl.classList.remove('has-img');
+    avImg.removeAttribute('src');
+    avInit.textContent = artist.addr ? avatarInitials(artist.addr) : ((artist.username || '·').trim().charAt(0) || '·').toUpperCase();
+    if (artist.addr) {
+      fetchArtist(artist.addr).then(function (res) {
+        var url = portraitUrl(res && res.portrait);
+        if (!url) return;
+        avImg.onload = function () { avEl.classList.add('has-img'); };
+        avImg.onerror = function () { avEl.classList.remove('has-img'); avImg.removeAttribute('src'); };
+        avImg.src = url;
+      }).catch(function () {});
+    }
+
+    // Bio.
+    var bioEl = document.getElementById('profile-bio');
+    var bioText = (artist.bio || '').trim();
+    if (bioText) {
+      bioEl.textContent = bioText;
+      bioEl.classList.remove('is-empty');
+    } else {
+      bioEl.textContent = isOwn ? 'No bio yet — add one with “Edit bio”.' : 'No bio yet.';
+      bioEl.classList.add('is-empty');
+    }
+    // Reset the bio editor to its closed state on every render.
+    document.getElementById('profile-bio-form').classList.add('hidden');
+    bioEl.classList.remove('hidden');
+
+    // Actions: Message for others (and only when the visitor is enrolled-ish,
+    // i.e. has a user id); Edit bio for your own enrolled profile.
+    var msgBtn = document.getElementById('profile-message-btn');
+    var editBtn = document.getElementById('profile-edit-bio-btn');
+    if (isOwn) {
+      msgBtn.classList.add('hidden');
+      // Only enrolled artists can hold a bio; the endpoint enforces it too.
+      editBtn.classList.toggle('hidden', !artist.enrolled);
+    } else {
+      editBtn.classList.add('hidden');
+      msgBtn.classList.toggle('hidden', !artist.user_id);
+    }
+
+    renderProfileWorks(works);
+  }
+
+  function openProfile(userId, username) {
+    userId = parseInt(userId, 10);
+    if (!userId) return;
+    profilePrevView = viewIdForActiveTab();
+    showView('view-profile');
+    // Optimistic header while the fetch resolves.
+    document.getElementById('profile-name').textContent = username || 'Artist';
+    document.getElementById('profile-addr').textContent = '';
+    document.getElementById('profile-works').innerHTML = '<p class="profile-empty">Loading…</p>';
+    var qs = username ? ('?username=' + encodeURIComponent(username)) : '';
+    return api('/api/artists/' + userId + qs).then(function (data) {
+      renderProfile(data);
+    }).catch(function (err) {
+      console.error('Profile load error:', err);
+      document.getElementById('profile-works').innerHTML = '<p class="profile-empty">Could not load this profile.</p>';
+    });
+  }
+
+  document.getElementById('profile-back').addEventListener('click', function () {
+    showView(profilePrevView || 'view-dash');
+  });
+
+  document.getElementById('profile-message-btn').addEventListener('click', function () {
+    if (profileCurrent && profileCurrent.userId && profileCurrent.username) {
+      startDmWith(profileCurrent.userId, profileCurrent.username);
+    }
+  });
+
+  document.getElementById('profile-edit-bio-btn').addEventListener('click', function () {
+    var form = document.getElementById('profile-bio-form');
+    var bioEl = document.getElementById('profile-bio');
+    var input = document.getElementById('profile-bio-input');
+    input.value = bioEl.classList.contains('is-empty') ? '' : bioEl.textContent;
+    form.classList.remove('hidden');
+    bioEl.classList.add('hidden');
+    input.focus();
+  });
+
+  document.getElementById('profile-bio-cancel').addEventListener('click', function () {
+    document.getElementById('profile-bio-form').classList.add('hidden');
+    document.getElementById('profile-bio').classList.remove('hidden');
+  });
+
+  document.getElementById('profile-bio-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = document.getElementById('profile-bio-input');
+    var submitBtn = e.target.querySelector('button[type="submit"]');
+    var bio = input.value.trim();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+    api('/api/artists/me/bio', {
+      method: 'POST',
+      body: JSON.stringify({ bio: bio }),
+    }).then(function (resp) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save bio';
+      // Re-open the profile so the saved bio (and closed editor) re-render.
+      if (profileCurrent && profileCurrent.userId) {
+        return openProfile(profileCurrent.userId, profileCurrent.username);
+      }
+    }).catch(function (err) {
+      console.error('Save bio error:', err);
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Save bio';
+    });
+  });
+
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -3002,20 +3328,31 @@
         var loginUrl = data.login_url || 'https://artists-collective.pages.dev/login';
         var uname = data.username || '';
         var code = data.code || '';
+        var magicUrl = data.magic_url || '';
 
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
-            '<a href="' + esc(loginUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(loginUrl) + '</a></p>' +
-          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
+            '<span class="web-access-url">' + esc(loginUrl) + '</span></p>' +
+          '<p class="web-access-line">Username for the login page: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
+          (magicUrl
+            ? '<p class="web-access-note">Tap <strong>Open in new tab</strong> to sign in instantly, or copy the link and paste it in Safari/Chrome.</p>' +
+              '<p class="web-access-note">If the link has expired, go to the address above and enter the username and code shown here.</p>'
+            : '') +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
-            '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' : '') +
+            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-open-tab">Open in new tab</button>' : '') +
           '</div>' +
-          '<p class="web-access-note">This replaces any code you generated before.</p>';
+          (magicUrl ? '' : '<p class="web-access-note">This replaces any code you generated before.</p>');
 
         bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
-        bindCopyButton(document.getElementById('web-access-copy-link'), loginUrl, 'Copy link');
+        if (magicUrl) {
+          bindCopyButton(document.getElementById('web-access-copy-link'), magicUrl, 'Copy link');
+          document.getElementById('web-access-open-tab').addEventListener('click', function () {
+            window.open(magicUrl, '_blank');
+          });
+        }
 
         resultEl.classList.remove('hidden');
         webAccessBtn.disabled = false;
@@ -3040,6 +3377,14 @@
   var MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
   var avatarChangeBtn = document.getElementById('avatar-change-btn');
   var avatarFileInput = document.getElementById('avatar-file');
+
+  // Clicking your own dashboard avatar opens your profile.
+  var dashAvatar = document.getElementById('avatar');
+  if (dashAvatar) {
+    dashAvatar.addEventListener('click', function () {
+      if (currentUserId) openProfile(currentUserId, null);
+    });
+  }
 
   function showAvatarError(msg) {
     var errEl = document.getElementById('avatar-error');
