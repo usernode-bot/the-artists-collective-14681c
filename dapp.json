@@ -34,6 +34,7 @@
     { "name": "Change profile picture button renders", "path": "/?demo=1", "expectSelector": "#avatar-change-btn" },
     { "name": "Messages tab renders", "path": "/?demo=1", "expectSelector": "#tab-messages" },
     { "name": "Messages view renders", "path": "/?demo=1", "expectSelector": "#view-messages" },
+    { "name": "Profile view renders", "path": "/?demo=1", "expectSelector": "#view-profile" },
     { "name": "Welcome panel renders", "path": "/?demo=welcome", "expectSelector": "#view-welcome" },
     { "name": "Fee Split outcome badge renders", "path": "/?demo=1", "expectSelector": ".proposal-outcome" }
   ]
