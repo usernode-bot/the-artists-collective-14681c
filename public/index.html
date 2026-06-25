@@ -80,31 +80,31 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper: #0f1013;
-      --paper-2: #181b1f;
-      --ink: #d4d0c8;
-      --ink-2: #7a7870;
-      --accent: #9b7fa8;
-      --ok: #5fa37d;
-      --line: #252830;
-      --header-bg: rgba(15, 16, 19, 0.90);
-      --pill-join-bg: rgba(95, 163, 125, 0.12);
-      --pill-sale-bg: rgba(155, 127, 168, 0.14);
+      --paper: #141310;
+      --paper-2: #221f17;
+      --ink: #e8e2d5;
+      --ink-2: #9a9080;
+      --accent: #d98c5f;
+      --ok: #74c79a;
+      --line: #2e2a22;
+      --header-bg: rgba(20, 19, 16, 0.88);
+      --pill-join-bg: rgba(116, 199, 154, 0.14);
+      --pill-sale-bg: rgba(217, 140, 95, 0.14);
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Hanken Grotesk', system-ui, sans-serif;
     }
 
     html.light {
-      --paper: #f2f2ef;
-      --paper-2: #e4e3de;
-      --ink: #1a1c20;
-      --ink-2: #5e5e65;
-      --accent: #6b4e7d;
-      --ok: #3d6e57;
-      --line: #d8d7d2;
-      --header-bg: rgba(242, 242, 239, 0.90);
-      --pill-join-bg: rgba(61, 110, 87, 0.12);
-      --pill-sale-bg: rgba(107, 78, 125, 0.14);
+      --paper: #fff;
+      --paper-2: #ece6d9;
+      --ink: #1d1b16;
+      --ink-2: #6b6355;
+      --accent: #8a3b2e;
+      --ok: #2f6b4d;
+      --line: #e4ded2;
+      --header-bg: rgba(255, 255, 255, 0.88);
+      --pill-join-bg: rgba(47, 107, 77, 0.12);
+      --pill-sale-bg: rgba(138, 59, 46, 0.12);
     }
 
     html {
@@ -153,9 +153,6 @@
     .brand em { font-style: italic; }
 
     header nav { display: flex; gap: 0.2rem; flex: 1; }
-
-    /* Current-page title shown in the header on mobile only */
-    .mob-header-title { display: none; }
 
     .tab {
       background: none;
@@ -474,158 +471,6 @@
       font-size: 0.8rem;
       margin-top: 0.4rem;
     }
-    #avatar { cursor: pointer; }
-
-    /* ── Artist profile ── */
-    .profile-header {
-      display: flex;
-      align-items: center;
-      gap: 1.1rem;
-      margin: 0.75rem 0 1.25rem;
-    }
-    .profile-avatar { width: 5rem; height: 5rem; cursor: default; }
-    .profile-id-text h1 { margin: 0 0 0.2rem; }
-    #profile-addr { margin: 0 0 0.5rem; }
-    .profile-actions { display: flex; gap: 0.5rem; }
-    .profile-msg-btn {
-      font: inherit;
-      font-size: 0.82rem;
-      color: var(--accent);
-      background: transparent;
-      border: 1px solid var(--accent);
-      border-radius: 999px;
-      padding: 0.3rem 0.9rem;
-      cursor: pointer;
-    }
-    .profile-msg-btn:hover:not(:disabled) { opacity: 0.82; }
-    .profile-bio { margin: 0; white-space: pre-wrap; line-height: 1.5; }
-    .profile-bio.is-empty { color: var(--ink-2); font-style: italic; }
-    #profile-bio-form textarea {
-      width: 100%;
-      box-sizing: border-box;
-      font: inherit;
-      padding: 0.5rem 0.65rem;
-      border-radius: 0.5rem;
-      border: 1px solid var(--line);
-      background: var(--paper);
-      color: var(--ink);
-      resize: vertical;
-    }
-    .profile-bio-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
-    .profile-bio-cancel {
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--ink);
-      border-radius: 999px;
-      padding: 0.35rem 0.9rem;
-      cursor: pointer;
-      font: inherit;
-      font-size: 0.85rem;
-    }
-    .profile-works-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 0.75rem;
-    }
-    .work-tile {
-      border: 1px solid var(--line);
-      border-radius: 0.6rem;
-      overflow: hidden;
-      background: var(--paper-2);
-    }
-    .work-thumb {
-      height: 96px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: #fff;
-      background: linear-gradient(135deg, #2a2338, #4a3658);
-    }
-    .work-meta { padding: 0.5rem 0.6rem; }
-    .work-title {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--ink);
-      word-break: break-word;
-    }
-    .work-date { font-size: 0.72rem; color: var(--ink-2); margin-top: 0.2rem; }
-    .profile-empty { color: var(--ink-2); font-style: italic; margin: 0; }
-    .work-tile { cursor: pointer; }
-    .work-tile:hover .work-thumb { opacity: 0.88; }
-
-    /* ── Artwork detail view ── */
-    .artwork-artist-link {
-      color: var(--accent);
-      text-decoration: none;
-      font-size: 0.9rem;
-    }
-    .artwork-artist-link:hover { text-decoration: underline; }
-    .artwork-date { color: var(--ink-2); font-size: 0.85rem; margin-top: 0.2rem; }
-
-    .artwork-reactions-bar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      padding: 0.25rem 0;
-    }
-    .reaction-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.3rem 0.75rem;
-      border: 1px solid var(--line);
-      border-radius: 2rem;
-      background: var(--paper-2);
-      font-size: 0.9rem;
-      cursor: pointer;
-      font-family: inherit;
-      color: var(--ink);
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .reaction-btn:hover { border-color: var(--accent); }
-    .reaction-btn.active {
-      border-color: var(--accent);
-      background: color-mix(in srgb, var(--accent) 12%, var(--paper-2));
-    }
-    .reaction-count { font-size: 0.8rem; color: var(--ink-2); }
-    .reaction-btn.active .reaction-count { color: var(--accent); }
-
-    .comment-list { display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem; }
-    .comment-item { display: flex; flex-direction: column; gap: 0.2rem; }
-    .comment-header { display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
-    .comment-author {
-      font-weight: 600;
-      font-size: 0.85rem;
-      color: var(--accent);
-      cursor: pointer;
-      text-decoration: none;
-      background: none;
-      border: none;
-      padding: 0;
-      font-family: inherit;
-    }
-    .comment-author:hover { text-decoration: underline; }
-    .comment-timestamp { font-size: 0.75rem; color: var(--ink-2); }
-    .comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.45; }
-
-    .comment-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
-    .comment-form textarea {
-      width: 100%;
-      padding: 0.5rem 0.6rem;
-      border: 1px solid var(--line);
-      border-radius: 0.4rem;
-      background: var(--paper-2);
-      color: var(--ink);
-      font: inherit;
-      font-size: 0.9rem;
-      resize: vertical;
-      box-sizing: border-box;
-    }
-    .comment-form textarea:focus { outline: none; border-color: var(--accent); }
-    .comment-form-row { display: flex; justify-content: flex-end; }
-    .comment-signin-hint { color: var(--ink-2); font-style: italic; font-size: 0.9rem; margin: 0.5rem 0 0; }
 
     /* ── Stats grid ── */
     .stats-grid {
@@ -991,19 +836,6 @@
 
     .own-addr { font-family: 'Courier New', monospace; }
     .own-pct { font-weight: 600; color: var(--ink); }
-    .own-name { font-weight: 600; color: var(--ink); }
-    button.own-name {
-      background: transparent;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-      font: inherit;
-      font-weight: 600;
-      text-decoration: underline;
-      text-decoration-color: transparent;
-    }
-    button.own-name:hover { color: var(--accent); text-decoration-color: var(--accent); }
-    .own-addr-sub { font-size: 0.7rem; color: var(--ink-2); margin: 0.1rem 0 0.3rem; }
 
     .own-bar-wrap {
       height: 5px;
@@ -1423,10 +1255,10 @@
       display: flex;
       align-items: center;
       gap: 0.5rem;
-      background: #181b1f;
+      background: #FAF8F4;
       border-radius: 9999px;
       padding: 0.6rem 1.1rem;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.32), 0 1px 4px rgba(0,0,0,0.16);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.14), 0 1px 4px rgba(0,0,0,0.08);
     }
 
     .mob-nav-item {
@@ -1441,7 +1273,7 @@
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.65rem;
       letter-spacing: 0.07em;
-      color: #7a7870;
+      color: #555047;
       text-transform: uppercase;
       font-weight: 500;
     }
@@ -1478,12 +1310,12 @@
       pointer-events: auto;
     }
     .mob-nav-item-left .mob-nav-arrow-inner {
-      border: 1.5px dashed #7a7870;
+      border: 1.5px dashed #555047;
     }
-    .mob-nav-item-left .mob-nav-label { color: #5a5a60; }
+    .mob-nav-item-left .mob-nav-label { color: #888; }
 
     .mob-nav-item-right .mob-nav-arrow-inner {
-      border: 2px solid #d4d0c8;
+      border: 2px solid #1d1b16;
     }
     .mob-nav-item-right.disabled {
       opacity: 0.38;
@@ -1496,237 +1328,34 @@
       gap: 0.35rem;
       padding: 0.45rem 1.05rem;
       border-radius: 9999px;
-      border: 1px solid #9b7fa8;
-      background: #181b1f;
+      border: 1px solid #a78bca;
+      background: #FAF8F4;
       font-family: 'Hanken Grotesk', system-ui, sans-serif;
       font-size: 0.82rem;
       font-weight: 500;
-      color: #d4d0c8;
+      color: #1d1b16;
       cursor: pointer;
       letter-spacing: 0.03em;
       transition: background 0.15s;
       text-decoration: none;
     }
-    .mob-nav-menu-btn:hover { background: #20242a; }
+    .mob-nav-menu-btn:hover { background: #f0ece4; }
 
     .mob-nav-divider {
       width: 1px;
       height: 1.75rem;
-      background: #252830;
+      background: #d8d2c6;
       margin: 0 0.1rem;
       flex-shrink: 0;
     }
 
-    /* show nav when studio is active — mobile only */
-    @media (max-width: 640px) {
-      body.studio-active #mobile-bottom-nav { display: flex; justify-content: center; }
-    }
+    /* show nav when studio is active */
+    body.studio-active #mobile-bottom-nav { display: flex; justify-content: center; }
 
     /* push content up so nav doesn't overlap */
     body.studio-active .view { padding-bottom: 5.5rem; }
 
     /* ── Responsive ── */
-    /* ── Collections ── */
-    .collection-row {
-      background: var(--paper-2);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 1rem 1.25rem;
-      margin-bottom: 0.75rem;
-      cursor: pointer;
-      transition: border-color 0.15s, background 0.15s;
-    }
-    .collection-row:hover { border-color: var(--accent); }
-    .collection-row-title {
-      font-family: var(--serif);
-      font-size: 1.2rem;
-      font-weight: 600;
-      line-height: 1.25;
-      margin-bottom: 0.2rem;
-    }
-    .collection-row-desc {
-      font-size: 0.83rem;
-      color: var(--ink-2);
-      margin-bottom: 0.3rem;
-      line-height: 1.45;
-    }
-    .collection-row-meta {
-      font-size: 0.77rem;
-      color: var(--ink-2);
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .coll-empty { font-size: 0.84rem; color: var(--ink-2); padding: 0.35rem 0; }
-    .coll-detail-title {
-      font-family: var(--serif);
-      font-size: 2rem;
-      font-weight: 400;
-      line-height: 1.2;
-      margin-bottom: 0.3rem;
-    }
-    .coll-detail-desc {
-      font-size: 0.9rem;
-      color: var(--ink-2);
-      line-height: 1.55;
-      margin-bottom: 0.5rem;
-    }
-    .coll-detail-meta {
-      font-size: 0.77rem;
-      color: var(--ink-2);
-      display: flex;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-      margin-bottom: 1.25rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--line);
-    }
-    .coll-works-grid { margin-top: 1rem; }
-    .coll-work-tile { position: relative; }
-    .coll-remove-btn {
-      position: absolute;
-      top: 0.3rem;
-      right: 0.3rem;
-      background: rgba(0,0,0,0.5);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      width: 1.4rem;
-      height: 1.4rem;
-      font-size: 1rem;
-      line-height: 1;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.15s;
-      padding: 0;
-    }
-    .coll-work-tile:hover .coll-remove-btn { opacity: 1; }
-    .coll-remove-btn:disabled { opacity: 0.4; cursor: default; }
-    .coll-owner-actions { margin-top: 1.25rem; display: flex; gap: 0.5rem; }
-    .coll-add-works-btn {
-      background: var(--ink);
-      color: var(--paper);
-      border: none;
-      border-radius: 4px;
-      font-family: var(--sans);
-      font-size: 0.85rem;
-      font-weight: 500;
-      padding: 0.55rem 1.1rem;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .coll-add-works-btn:hover { opacity: 0.82; }
-    .coll-add-works-panel {
-      margin-top: 0.85rem;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: var(--paper);
-      padding: 0.75rem;
-      max-height: 18rem;
-      overflow-y: auto;
-    }
-    .add-works-list { display: flex; flex-direction: column; }
-    .add-work-row {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.4rem 0;
-      border-bottom: 1px solid var(--line);
-      font-size: 0.84rem;
-    }
-    .add-work-row:last-child { border-bottom: none; }
-    .add-work-row-added { opacity: 0.5; }
-    .add-work-title {
-      flex: 1;
-      font-family: var(--serif);
-      font-style: italic;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--ink);
-    }
-    .add-work-artist { font-size: 0.77rem; color: var(--ink-2); flex-shrink: 0; }
-    .add-work-status { font-size: 0.77rem; color: var(--ink-2); flex-shrink: 0; }
-    .add-work-btn {
-      flex-shrink: 0;
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      border-radius: 4px;
-      font-family: var(--sans);
-      font-size: 0.77rem;
-      font-weight: 500;
-      padding: 0.25rem 0.6rem;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .add-work-btn:hover:not(:disabled) { opacity: 0.78; }
-    .add-work-btn:disabled { opacity: 0.45; cursor: default; }
-    .coll-danger-zone { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--line); }
-    .coll-delete-btn {
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      border-radius: 4px;
-      font-family: var(--sans);
-      font-size: 0.84rem;
-      font-weight: 500;
-      padding: 0.45rem 0.9rem;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    .coll-delete-btn:hover:not(:disabled) { opacity: 0.78; }
-    .coll-delete-btn:disabled { opacity: 0.45; cursor: default; }
-    #coll-create-form { display: flex; flex-direction: column; gap: 0.5rem; }
-    #coll-create-form input,
-    #coll-create-form textarea {
-      background: var(--paper);
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      color: var(--ink);
-      font-family: var(--sans);
-      font-size: 0.85rem;
-      padding: 0.5rem 0.75rem;
-      outline: none;
-      transition: border-color 0.15s;
-      resize: vertical;
-    }
-    #coll-create-form input:focus,
-    #coll-create-form textarea:focus { border-color: var(--accent); }
-    #coll-create-form input::placeholder,
-    #coll-create-form textarea::placeholder { color: var(--ink-2); }
-    #coll-create-form button {
-      align-self: flex-start;
-      background: var(--ink);
-      color: var(--paper);
-      border: none;
-      border-radius: 4px;
-      font-family: var(--sans);
-      font-size: 0.85rem;
-      font-weight: 500;
-      padding: 0.55rem 1.1rem;
-      cursor: pointer;
-      transition: opacity 0.15s;
-    }
-    #coll-create-form button:hover:not(:disabled) { opacity: 0.82; }
-    #coll-create-form button:disabled { opacity: 0.45; cursor: default; }
-    .coll-profile-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.5rem 0;
-      border-bottom: 1px solid var(--line);
-      cursor: pointer;
-      transition: color 0.15s;
-    }
-    .coll-profile-row:last-child { border-bottom: none; }
-    .coll-profile-row:hover .coll-profile-title { color: var(--accent); }
-    .coll-profile-title { font-family: var(--serif); font-size: 0.95rem; color: var(--ink); }
-    .coll-profile-count { font-size: 0.77rem; color: var(--ink-2); flex-shrink: 0; }
-
     @media (max-width: 680px) {
       .panels { grid-template-columns: 1fr; }
       header { padding: 0 1rem; gap: 0.65rem; }
@@ -1753,26 +1382,24 @@
     @media (max-width: 640px) {
       body { overflow-x: clip; }
       header {
+        height: auto;
+        flex-wrap: wrap;
         align-items: center;
         padding: 0.5rem 1rem;
-        gap: 0.5rem;
+        gap: 0.4rem;
       }
-      .brand { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .brand { flex: 1; }
       .header-right { order: 2; }
-      /* Hide the tab row on mobile — navigation moves to the bottom pill */
-      header nav { display: none; }
-      /* Centred current-page title fills the space between brand and controls */
-      .mob-header-title {
-        display: block;
-        flex: 1;
-        text-align: center;
-        font-size: 0.85rem;
-        font-weight: 500;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: var(--ink);
+      header nav {
+        order: 3;
+        flex: 0 0 100%;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
+      header nav::-webkit-scrollbar { display: none; }
     }
   </style>
 </head>
@@ -1781,14 +1408,12 @@
 <!-- Sticky header (hidden until studio is entered) -->
 <header id="site-header" class="hidden">
   <span class="brand">The Artists' Collective.<em> Studio</em></span>
-  <span id="mob-header-title" class="mob-header-title">Dashboard</span>
   <nav>
     <button id="tab-dash" class="tab active">Dashboard</button>
     <button id="tab-ledger" class="tab">Ledger</button>
     <button id="tab-forum" class="tab">Forum</button>
     <button id="tab-messages" class="tab">Messages</button>
     <button id="tab-web" class="tab">Desktop access</button>
-    <button id="tab-collections" class="tab">Collections</button>
   </nav>
   <div class="header-right">
     <button id="theme-toggle" aria-label="Toggle theme">☾</button>
@@ -2008,95 +1633,6 @@
   </div>
 </div>
 
-<!-- View: Artist profile (reached by clicking a name/avatar; not a top-level tab) -->
-<div id="view-profile" class="view hidden">
-  <button id="profile-back" class="forum-back" type="button">← Back</button>
-  <div class="profile-header">
-    <div class="avatar profile-avatar" id="profile-avatar">
-      <span class="avatar-initials" id="profile-avatar-initials">·</span>
-      <img class="avatar-img" id="profile-avatar-img" alt="Artist profile picture" />
-    </div>
-    <div class="profile-id-text">
-      <h1 id="profile-name">Artist</h1>
-      <p class="subtitle mono" id="profile-addr"></p>
-      <div class="profile-actions">
-        <button id="profile-message-btn" class="profile-msg-btn hidden" type="button">Message</button>
-        <button id="profile-edit-bio-btn" class="profile-msg-btn hidden" type="button">Edit bio</button>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Bio</h2>
-    <p id="profile-bio" class="profile-bio">No bio yet.</p>
-    <form id="profile-bio-form" class="hidden" autocomplete="off">
-      <textarea id="profile-bio-input" placeholder="Tell the collective about yourself and your work…" maxlength="1000" rows="4"></textarea>
-      <div class="profile-bio-actions">
-        <button type="submit">Save bio</button>
-        <button type="button" id="profile-bio-cancel" class="profile-bio-cancel">Cancel</button>
-      </div>
-    </form>
-  </div>
-
-  <div class="card">
-    <h2>Works</h2>
-    <div id="profile-works"></div>
-  </div>
-
-  <div class="card">
-    <h2>Collections</h2>
-    <div id="profile-collections"></div>
-  </div>
-</div>
-
-<!-- View: Collections -->
-<div id="view-collections" class="view hidden">
-  <!-- Sub-view: collection list -->
-  <div id="collections-list-view">
-    <div class="dash-header">
-      <h1>Collections</h1>
-      <p class="subtitle">Curated showcases assembled by members.</p>
-    </div>
-    <div class="card forum-new-card">
-      <h2>Create a collection</h2>
-      <form id="coll-create-form" autocomplete="off">
-        <input type="text" id="coll-title-input" placeholder="Collection title" required maxlength="120">
-        <textarea id="coll-desc-input" placeholder="Description (optional)" maxlength="2000" rows="2"></textarea>
-        <button type="submit">Create collection</button>
-      </form>
-    </div>
-    <div id="collections-list"><p class="coll-empty">Loading…</p></div>
-  </div>
-  <!-- Sub-view: collection detail -->
-  <div id="collections-detail-view" class="hidden">
-    <button id="coll-back" class="forum-back" type="button">← Back to collections</button>
-    <div id="coll-detail"></div>
-  </div>
-</div>
-
-<div id="view-artwork" class="view hidden">
-  <button id="artwork-back" class="forum-back" type="button">← Back</button>
-
-  <div class="card">
-    <h1 id="artwork-title" style="margin:0 0 0.25rem;font-size:1.3rem"></h1>
-    <div id="artwork-date" class="artwork-date"></div>
-    <div style="margin-top:0.5rem">
-      <button id="artwork-artist-btn" class="artwork-artist-link" type="button"></button>
-    </div>
-  </div>
-
-  <div class="card">
-    <h2>Reactions</h2>
-    <div id="artwork-reactions" class="artwork-reactions-bar"></div>
-  </div>
-
-  <div class="card">
-    <h2>Comments</h2>
-    <div id="artwork-comments-list" class="comment-list"></div>
-    <div id="artwork-comment-form-wrap"></div>
-  </div>
-</div>
-
 <!-- Mobile bottom navigation -->
 <nav id="mobile-bottom-nav" aria-label="Page navigation">
   <div class="mob-nav-pill">
@@ -2105,7 +1641,7 @@
       <button class="mob-nav-arrow" id="mob-nav-prev-btn" aria-label="Previous page" tabindex="-1">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M8.5 3L4.5 7L8.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M8.5 3L4.5 7L8.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
@@ -2118,7 +1654,7 @@
     <div class="mob-nav-item">
       <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#9b7fa8" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
+          <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         </svg>
         Menu
       </a>
@@ -2131,7 +1667,7 @@
       <button class="mob-nav-arrow" id="mob-nav-next-btn" aria-label="Next page">
         <div class="mob-nav-arrow-inner">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5.5 3L9.5 7L5.5 11" stroke="#d4d0c8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5.5 3L9.5 7L5.5 11" stroke="#1d1b16" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
       </button>
@@ -2548,18 +2084,12 @@
   function renderOwnership(enrolments) {
     var el = document.getElementById('ownership-bars');
     var seen = [];
-    var byAddr = {};
     enrolments.forEach(function (row) {
-      if (row.addr && seen.indexOf(row.addr) === -1) {
-        seen.push(row.addr);
-        byAddr[row.addr] = { user_id: row.user_id, username: row.username };
-      }
+      if (row.addr && seen.indexOf(row.addr) === -1) seen.push(row.addr);
     });
     var n = Math.max(1, seen.length);
     var pct = Math.round(100 / n);
-    var artists = seen.map(function (addr) {
-      return { addr: addr, pct: pct, user_id: byAddr[addr].user_id, username: byAddr[addr].username };
-    });
+    var artists = seen.map(function (addr) { return { addr: addr, pct: pct }; });
 
     if (!artists.length) {
       el.innerHTML = '<p class="sales-empty">No artists enrolled yet.</p>';
@@ -2568,25 +2098,15 @@
 
     el.innerHTML = '<div class="ownership-bars">' +
       artists.map(function (a) {
-        var label = a.user_id
-          ? '<button class="dm-author-link own-name" data-uid="' + a.user_id + '" data-uname="' + esc(a.username || '') + '">' + esc(a.username || truncAddr(a.addr)) + '</button>'
-          : '<span class="own-name">' + esc(a.username || truncAddr(a.addr)) + '</span>';
         return '<div class="own-row">' +
           '<div class="own-label-row">' +
-            label +
+            '<span class="own-addr">' + truncAddr(a.addr) + '</span>' +
             '<span class="own-pct">' + a.pct + '%</span>' +
           '</div>' +
-          '<div class="own-addr-sub mono">' + esc(truncAddr(a.addr)) + '</div>' +
           '<div class="own-bar-wrap"><div class="own-bar-fill" style="width:' + a.pct + '%"></div></div>' +
         '</div>';
       }).join('') +
     '</div>';
-
-    el.querySelectorAll('.own-name[data-uid]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
-      });
-    });
   }
 
   // ── Render: ledger ────────────────────────────────────────────────────────
@@ -2750,7 +2270,7 @@
     el.innerHTML = threads.map(function (t) {
       var count = t.reply_count || 0;
       var replyLabel = count === 1 ? '1 reply' : count + ' replies';
-      var authorHtml = t.user_id
+      var authorHtml = (t.user_id && currentUserId && t.user_id !== currentUserId)
         ? '<button class="dm-author-link thread-author" data-uid="' + t.user_id + '" data-uname="' + esc(t.username) + '">' + esc(t.username) + '</button>'
         : '<span class="thread-author">' + esc(t.username) + '</span>';
       return '<div class="thread-row" data-id="' + t.id + '">' +
@@ -2772,7 +2292,7 @@
     el.querySelectorAll('.dm-author-link').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.stopPropagation();
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
       });
     });
   }
@@ -2788,8 +2308,9 @@
   }
 
   function renderPost(author, uid, ts, body, isOp) {
+    var isOwn = uid && currentUserId && uid === currentUserId;
     var authorHtml;
-    if (!uid) {
+    if (isOwn || !uid) {
       authorHtml = '<span class="post-author">' + esc(author) + '</span>';
     } else {
       authorHtml = '<button class="dm-author-link" data-uid="' + uid + '" data-uname="' + esc(author) + '">' + esc(author) + '</button>';
@@ -2825,7 +2346,7 @@
 
     el.querySelectorAll('.dm-author-link').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
+        startDmWith(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
       });
     });
 
@@ -2953,7 +2474,7 @@
       var raw = c.last_message_body || '';
       var preview = raw ? (raw.length > 60 ? esc(raw.slice(0, 60)) + '…' : esc(raw)) : '<em>No messages yet</em>';
       var hasUnread = c.unread_count > 0;
-      return '<div class="dm-conv-row' + (hasUnread ? ' has-unread' : '') + '" data-id="' + c.id + '" data-uid="' + (c.other_id || '') + '" data-uname="' + esc(c.other_username) + '">' +
+      return '<div class="dm-conv-row' + (hasUnread ? ' has-unread' : '') + '" data-id="' + c.id + '" data-uname="' + esc(c.other_username) + '">' +
         '<div class="dm-conv-left">' +
           '<div class="dm-conv-username">' + esc(c.other_username) + '</div>' +
           '<div class="dm-conv-preview">' + preview + '</div>' +
@@ -2967,37 +2488,27 @@
 
     el.querySelectorAll('.dm-conv-row').forEach(function (row) {
       row.addEventListener('click', function () {
-        openDmConversation(parseInt(row.dataset.id, 10), row.dataset.uname, parseInt(row.dataset.uid, 10) || 0);
+        openDmConversation(parseInt(row.dataset.id, 10), row.dataset.uname);
       });
     });
   }
 
-  function openDmConversation(convId, otherUsername, otherId) {
+  function openDmConversation(convId, otherUsername) {
     currentDmConvId = convId;
     showDmThread();
     var el = document.getElementById('dm-thread-detail');
     el.innerHTML = '<p class="dm-empty">Loading…</p>';
     return api('/api/dm/conversations/' + convId + '/messages').then(function (data) {
-      renderDmThread(convId, otherUsername, (data && data.messages) || [], otherId);
+      renderDmThread(convId, otherUsername, (data && data.messages) || []);
       loadDmUnreadCount();
     }).catch(function () {
       el.innerHTML = '<p class="dm-empty">Could not load this conversation. Please try again.</p>';
     });
   }
 
-  function renderDmThread(convId, otherUsername, messages, otherId) {
+  function renderDmThread(convId, otherUsername, messages) {
     var el = document.getElementById('dm-thread-detail');
-    // The other person's id may be passed in, or inferred from the first
-    // incoming message — used to make their name link to their profile.
-    if (!otherId) {
-      for (var i = 0; i < messages.length; i++) {
-        if (messages[i].sender_id && messages[i].sender_id !== currentUserId) { otherId = messages[i].sender_id; break; }
-      }
-    }
-    var headerName = otherId
-      ? '<button class="dm-author-link" data-uid="' + otherId + '" data-uname="' + esc(otherUsername) + '">' + esc(otherUsername) + '</button>'
-      : esc(otherUsername);
-    var html = '<div class="dm-thread-header">Conversation with ' + headerName + '</div>';
+    var html = '<div class="dm-thread-header">Conversation with ' + esc(otherUsername) + '</div>';
     html += '<div class="dm-messages">';
     if (messages.length) {
       messages.forEach(function (m) {
@@ -3007,10 +2518,7 @@
         if (isOwn) {
           html += esc(formatStamp(m.created_at));
         } else {
-          var nameHtml = m.sender_id
-            ? '<button class="dm-author-link dm-msg-username" data-uid="' + m.sender_id + '" data-uname="' + esc(m.sender_username) + '">' + esc(m.sender_username) + '</button>'
-            : '<span class="dm-msg-username">' + esc(m.sender_username) + '</span>';
-          html += nameHtml + ' · ' + esc(formatStamp(m.created_at));
+          html += '<span class="dm-msg-username">' + esc(m.sender_username) + '</span> · ' + esc(formatStamp(m.created_at));
         }
         html += '</div>' +
           '<div class="dm-msg-bubble">' + esc(m.body) + '</div>' +
@@ -3028,12 +2536,6 @@
 
     el.innerHTML = html;
 
-    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
-      });
-    });
-
     document.getElementById('dm-reply-form').addEventListener('submit', function (e) {
       e.preventDefault();
       var bodyInput = document.getElementById('dm-reply-body');
@@ -3047,7 +2549,7 @@
         body: JSON.stringify({ body: body }),
       }).then(function () {
         bodyInput.value = '';
-        return openDmConversation(convId, otherUsername, otherId);
+        return openDmConversation(convId, otherUsername);
       }).catch(function (err) {
         console.error('DM send error:', err);
         submitBtn.disabled = false;
@@ -3065,7 +2567,7 @@
       body: JSON.stringify({ recipient_id: uid, recipient_username: username }),
     }).then(function (data) {
       if (data && data.conversation) {
-        openDmConversation(data.conversation.id, username, uid);
+        openDmConversation(data.conversation.id, username);
       }
     }).catch(function (err) {
       console.error('startDmWith error:', err);
@@ -3118,7 +2620,7 @@
         document.getElementById('dm-new-form-wrap').style.display = 'none';
         btn.disabled = false;
         btn.textContent = 'Send';
-        return openDmConversation(convId, recip.username, recip.id);
+        return openDmConversation(convId, recip.username);
       });
     }).catch(function (err) {
       console.error('New DM error:', err);
@@ -3132,595 +2634,9 @@
     loadDmConversations();
   });
 
-  // ── Artist profile ─────────────────────────────────────────────────────────
-  // Reached by clicking a name/avatar anywhere in the app. Not a top-level tab:
-  // a static #view-profile div is shown via showView, with a "← Back" button
-  // that restores whichever view the visitor came from.
-  var profilePrevView = 'view-dash';
-  var profileCurrent = null; // { userId, username, addr }
-
-  function viewIdForActiveTab() {
-    // Best-effort "where am I" for Back: the currently-visible non-profile view.
-    var ids = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el && !el.classList.contains('hidden')) return ids[i];
-    }
-    return 'view-dash';
-  }
-
-  function renderProfileWorks(works) {
-    var el = document.getElementById('profile-works');
-    if (!works || !works.length) {
-      el.innerHTML = '<p class="profile-empty">No works recorded yet.</p>';
-      return;
-    }
-    el.innerHTML = '<div class="profile-works-grid">' +
-      works.map(function (w) {
-        var title = w.title || 'Untitled';
-        var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
-        var date = formatStamp(w.created_at);
-        return '<div class="work-tile" data-sale-id="' + esc(String(w.id)) + '" data-sale-title="' + esc(title) + '" data-sale-created="' + esc(String(w.created_at || '')) + '">' +
-          '<div class="work-thumb">' + esc(initial) + '</div>' +
-          '<div class="work-meta">' +
-            '<div class="work-title">' + esc(title) + '</div>' +
-            (date ? '<div class="work-date">' + esc(date) + '</div>' : '') +
-          '</div>' +
-        '</div>';
-      }).join('') +
-    '</div>';
-    el.querySelectorAll('.work-tile').forEach(function (tile) {
-      tile.addEventListener('click', function () {
-        openArtwork(
-          parseInt(tile.dataset.saleId, 10),
-          tile.dataset.saleTitle || '',
-          tile.dataset.saleCreated || '',
-          profileCurrent.userId,
-          profileCurrent.username
-        );
-      });
-    });
-  }
-
-  function renderProfile(data) {
-    var artist = (data && data.artist) || {};
-    var works = (data && data.works) || [];
-    var isOwn = artist.user_id && currentUserId && artist.user_id === currentUserId;
-    profileCurrent = { userId: artist.user_id, username: artist.username, addr: artist.addr };
-
-    document.getElementById('profile-name').textContent = artist.username || 'Artist';
-    document.getElementById('profile-addr').textContent = artist.addr ? truncAddr(artist.addr) : '';
-
-    // Avatar: initials from the addr (or name), then swap in the portrait if the
-    // artist website has one. Mirrors the dashboard avatar behaviour.
-    var avEl = document.getElementById('profile-avatar');
-    var avImg = document.getElementById('profile-avatar-img');
-    var avInit = document.getElementById('profile-avatar-initials');
-    avEl.classList.remove('has-img');
-    avImg.removeAttribute('src');
-    avInit.textContent = artist.addr ? avatarInitials(artist.addr) : ((artist.username || '·').trim().charAt(0) || '·').toUpperCase();
-    if (artist.addr) {
-      fetchArtist(artist.addr).then(function (res) {
-        var url = portraitUrl(res && res.portrait);
-        if (!url) return;
-        avImg.onload = function () { avEl.classList.add('has-img'); };
-        avImg.onerror = function () { avEl.classList.remove('has-img'); avImg.removeAttribute('src'); };
-        avImg.src = url;
-      }).catch(function () {});
-    }
-
-    // Bio.
-    var bioEl = document.getElementById('profile-bio');
-    var bioText = (artist.bio || '').trim();
-    if (bioText) {
-      bioEl.textContent = bioText;
-      bioEl.classList.remove('is-empty');
-    } else {
-      bioEl.textContent = isOwn ? 'No bio yet — add one with “Edit bio”.' : 'No bio yet.';
-      bioEl.classList.add('is-empty');
-    }
-    // Reset the bio editor to its closed state on every render.
-    document.getElementById('profile-bio-form').classList.add('hidden');
-    bioEl.classList.remove('hidden');
-
-    // Actions: Message for others (and only when the visitor is enrolled-ish,
-    // i.e. has a user id); Edit bio for your own enrolled profile.
-    var msgBtn = document.getElementById('profile-message-btn');
-    var editBtn = document.getElementById('profile-edit-bio-btn');
-    if (isOwn) {
-      msgBtn.classList.add('hidden');
-      // Only enrolled artists can hold a bio; the endpoint enforces it too.
-      editBtn.classList.toggle('hidden', !artist.enrolled);
-    } else {
-      editBtn.classList.add('hidden');
-      msgBtn.classList.toggle('hidden', !artist.user_id);
-    }
-
-    renderProfileWorks(works);
-    if (artist.user_id) loadProfileCollections(artist.user_id);
-  }
-
-  function openProfile(userId, username) {
-    userId = parseInt(userId, 10);
-    if (!userId) return;
-    profilePrevView = viewIdForActiveTab();
-    showView('view-profile');
-    // Optimistic header while the fetch resolves.
-    document.getElementById('profile-name').textContent = username || 'Artist';
-    document.getElementById('profile-addr').textContent = '';
-    document.getElementById('profile-works').innerHTML = '<p class="profile-empty">Loading…</p>';
-    var qs = username ? ('?username=' + encodeURIComponent(username)) : '';
-    return api('/api/artists/' + userId + qs).then(function (data) {
-      renderProfile(data);
-    }).catch(function (err) {
-      console.error('Profile load error:', err);
-      document.getElementById('profile-works').innerHTML = '<p class="profile-empty">Could not load this profile.</p>';
-    });
-  }
-
-  document.getElementById('profile-back').addEventListener('click', function () {
-    showView(profilePrevView || 'view-dash');
-  });
-
-  document.getElementById('profile-message-btn').addEventListener('click', function () {
-    if (profileCurrent && profileCurrent.userId && profileCurrent.username) {
-      startDmWith(profileCurrent.userId, profileCurrent.username);
-    }
-  });
-
-  document.getElementById('profile-edit-bio-btn').addEventListener('click', function () {
-    var form = document.getElementById('profile-bio-form');
-    var bioEl = document.getElementById('profile-bio');
-    var input = document.getElementById('profile-bio-input');
-    input.value = bioEl.classList.contains('is-empty') ? '' : bioEl.textContent;
-    form.classList.remove('hidden');
-    bioEl.classList.add('hidden');
-    input.focus();
-  });
-
-  document.getElementById('profile-bio-cancel').addEventListener('click', function () {
-    document.getElementById('profile-bio-form').classList.add('hidden');
-    document.getElementById('profile-bio').classList.remove('hidden');
-  });
-
-  document.getElementById('profile-bio-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var input = document.getElementById('profile-bio-input');
-    var submitBtn = e.target.querySelector('button[type="submit"]');
-    var bio = input.value.trim();
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving…';
-    api('/api/artists/me/bio', {
-      method: 'POST',
-      body: JSON.stringify({ bio: bio }),
-    }).then(function (resp) {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Save bio';
-      // Re-open the profile so the saved bio (and closed editor) re-render.
-      if (profileCurrent && profileCurrent.userId) {
-        return openProfile(profileCurrent.userId, profileCurrent.username);
-      }
-    }).catch(function (err) {
-      console.error('Save bio error:', err);
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Save bio';
-    });
-  });
-
-  // ── Collections ──────────────────────────────────────────────────────────────
-  var currentCollectionId = null;
-
-  function showCollectionsList() {
-    document.getElementById('collections-list-view').classList.remove('hidden');
-    document.getElementById('collections-detail-view').classList.add('hidden');
-    currentCollectionId = null;
-  }
-
-  function showCollectionsDetail() {
-    document.getElementById('collections-list-view').classList.add('hidden');
-    document.getElementById('collections-detail-view').classList.remove('hidden');
-  }
-
-  function loadCollections() {
-    var el = document.getElementById('collections-list');
-    if (!el) return Promise.resolve();
-    el.innerHTML = '<p class="coll-empty">Loading…</p>';
-    return api('/api/collections').then(function (data) {
-      renderCollectionsList((data && data.collections) || []);
-    }).catch(function () {
-      el.innerHTML = '<p class="coll-empty">Could not load collections. Please try again.</p>';
-    });
-  }
-
-  function renderCollectionsList(collections) {
-    var el = document.getElementById('collections-list');
-    if (!collections.length) {
-      el.innerHTML = '<p class="coll-empty">No collections yet — create the first one above.</p>';
-      return;
-    }
-    el.innerHTML = collections.map(function (c) {
-      var descSnippet = c.description ? (c.description.length > 100 ? esc(c.description.slice(0, 100)) + '…' : esc(c.description)) : '';
-      var itemLabel = c.item_count === 1 ? '1 work' : (c.item_count || 0) + ' works';
-      var curatorHtml = c.user_id
-        ? '<button class="dm-author-link coll-curator" data-uid="' + c.user_id + '" data-uname="' + esc(c.username || '') + '">' + esc(c.username) + '</button>'
-        : '<span>' + esc(c.username) + '</span>';
-      return '<div class="collection-row" data-id="' + c.id + '">' +
-        '<div class="collection-row-title">' + esc(c.title) + '</div>' +
-        (descSnippet ? '<div class="collection-row-desc">' + descSnippet + '</div>' : '') +
-        '<div class="collection-row-meta">' +
-          curatorHtml + '<span>' + itemLabel + '</span><span>' + esc(formatStamp(c.created_at)) + '</span>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    el.querySelectorAll('.collection-row').forEach(function (row) {
-      row.addEventListener('click', function () {
-        openCollection(parseInt(row.dataset.id, 10));
-      });
-    });
-    el.querySelectorAll('.coll-curator').forEach(function (btn) {
-      btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
-      });
-    });
-  }
-
-  function openCollection(id) {
-    currentCollectionId = id;
-    showCollectionsDetail();
-    var el = document.getElementById('coll-detail');
-    el.innerHTML = '<p class="coll-empty">Loading…</p>';
-    return api('/api/collections/' + id).then(function (data) {
-      renderCollectionDetail(data.collection, data.items || []);
-    }).catch(function () {
-      el.innerHTML = '<p class="coll-empty">Could not load this collection.</p>';
-    });
-  }
-
-  function renderCollectionDetail(coll, items) {
-    var el = document.getElementById('coll-detail');
-    var isOwner = coll.user_id && currentUserId && coll.user_id === currentUserId;
-    var curatorHtml = coll.user_id
-      ? '<button class="dm-author-link" data-uid="' + coll.user_id + '" data-uname="' + esc(coll.username || '') + '">' + esc(coll.username) + '</button>'
-      : '<span>' + esc(coll.username) + '</span>';
-
-    var html = '<div class="coll-detail-title">' + esc(coll.title) + '</div>';
-    if (coll.description) {
-      html += '<p class="coll-detail-desc">' + esc(coll.description) + '</p>';
-    }
-    html += '<div class="coll-detail-meta">' + curatorHtml + '<span>' + esc(formatStamp(coll.created_at)) + '</span></div>';
-
-    if (!items.length) {
-      html += '<p class="coll-empty">' + (isOwner ? 'No works added yet — use Add works to start curating.' : 'No works in this collection yet.') + '</p>';
-    } else {
-      html += '<div class="profile-works-grid coll-works-grid">';
-      items.forEach(function (item) {
-        var title = item.work_title || 'Untitled';
-        var initial = (String(title).replace(/^Staging demo — /, '').trim().charAt(0) || '·').toUpperCase();
-        var date = formatStamp(item.added_at);
-        html += '<div class="work-tile coll-work-tile">' +
-          '<div class="work-thumb">' + esc(initial) + '</div>' +
-          '<div class="work-meta">' +
-            '<div class="work-title">' + esc(title) + '</div>' +
-            '<div class="work-date">' + esc(item.artist_username) + (date ? ' · ' + esc(date) : '') + '</div>' +
-            (isOwner ? '<button class="coll-remove-btn" data-item-id="' + item.id + '" title="Remove">×</button>' : '') +
-          '</div>' +
-        '</div>';
-      });
-      html += '</div>';
-    }
-
-    if (isOwner) {
-      html += '<div class="coll-owner-actions">' +
-        '<button class="coll-add-works-btn" id="coll-add-works-btn" type="button">Add works</button>' +
-      '</div>' +
-      '<div id="coll-add-works-panel" class="coll-add-works-panel hidden"></div>' +
-      '<div class="coll-danger-zone">' +
-        '<button class="coll-delete-btn" id="coll-delete-btn" type="button">Delete collection</button>' +
-      '</div>';
-    }
-
-    el.innerHTML = html;
-
-    el.querySelectorAll('.dm-author-link').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
-      });
-    });
-
-    if (isOwner) {
-      el.querySelectorAll('.coll-remove-btn').forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-          e.stopPropagation();
-          var itemId = parseInt(btn.dataset.itemId, 10);
-          btn.disabled = true;
-          api('/api/collections/' + coll.id + '/items/' + itemId, { method: 'DELETE' })
-            .then(function () { return openCollection(coll.id); })
-            .catch(function () { btn.disabled = false; });
-        });
-      });
-
-      var addWorksBtn = document.getElementById('coll-add-works-btn');
-      var addWorksPanel = document.getElementById('coll-add-works-panel');
-      if (addWorksBtn && addWorksPanel) {
-        addWorksBtn.addEventListener('click', function () {
-          if (!addWorksPanel.classList.contains('hidden')) {
-            addWorksPanel.classList.add('hidden');
-            addWorksPanel.innerHTML = '';
-            return;
-          }
-          addWorksPanel.innerHTML = '<p class="coll-empty">Loading works…</p>';
-          addWorksPanel.classList.remove('hidden');
-          var alreadyInColl = {};
-          items.forEach(function (it) { alreadyInColl[it.sale_id] = true; });
-
-          api('/api/sales').then(function (data) {
-            var sales = (data && data.sales) || [];
-            if (!sales.length) {
-              addWorksPanel.innerHTML = '<p class="coll-empty">No works recorded yet.</p>';
-              return;
-            }
-            var listHtml = '<div class="add-works-list">';
-            sales.forEach(function (s) {
-              var added = alreadyInColl[s.id];
-              listHtml += '<div class="add-work-row' + (added ? ' add-work-row-added' : '') + '">' +
-                '<span class="add-work-title">' + esc(s.title) + '</span>' +
-                '<span class="add-work-artist">' + esc(s.username) + '</span>' +
-                (added
-                  ? '<span class="add-work-status">Added</span>'
-                  : '<button class="add-work-btn" data-sale-id="' + s.id + '" type="button">Add</button>'
-                ) +
-              '</div>';
-            });
-            listHtml += '</div>';
-            addWorksPanel.innerHTML = listHtml;
-
-            addWorksPanel.querySelectorAll('.add-work-btn').forEach(function (btn) {
-              btn.addEventListener('click', function () {
-                var saleId = parseInt(btn.dataset.saleId, 10);
-                btn.disabled = true;
-                btn.textContent = 'Adding…';
-                api('/api/collections/' + coll.id + '/items', {
-                  method: 'POST',
-                  body: JSON.stringify({ sale_id: saleId }),
-                }).then(function () {
-                  return openCollection(coll.id);
-                }).catch(function (err) {
-                  console.error('Add work error:', err);
-                  btn.disabled = false;
-                  btn.textContent = 'Add';
-                });
-              });
-            });
-          }).catch(function () {
-            addWorksPanel.innerHTML = '<p class="coll-empty">Could not load works. Please try again.</p>';
-          });
-        });
-      }
-
-      var deleteBtn = document.getElementById('coll-delete-btn');
-      if (deleteBtn) {
-        deleteBtn.addEventListener('click', function () {
-          if (deleteBtn.dataset.confirming) {
-            deleteBtn.disabled = true;
-            deleteBtn.textContent = 'Deleting…';
-            api('/api/collections/' + coll.id, { method: 'DELETE' })
-              .then(function () {
-                showCollectionsList();
-                return loadCollections();
-              })
-              .catch(function () {
-                deleteBtn.disabled = false;
-                deleteBtn.textContent = 'Delete collection';
-                delete deleteBtn.dataset.confirming;
-              });
-          } else {
-            deleteBtn.dataset.confirming = '1';
-            deleteBtn.textContent = 'Tap again to confirm deletion';
-            setTimeout(function () {
-              if (deleteBtn && deleteBtn.dataset.confirming) {
-                delete deleteBtn.dataset.confirming;
-                deleteBtn.textContent = 'Delete collection';
-              }
-            }, 3000);
-          }
-        });
-      }
-    }
-  }
-
-  function loadProfileCollections(userId) {
-    var el = document.getElementById('profile-collections');
-    if (!el) return;
-    el.innerHTML = '<p class="profile-empty">Loading…</p>';
-    api('/api/artists/' + userId + '/collections').then(function (data) {
-      renderProfileCollections((data && data.collections) || []);
-    }).catch(function () {
-      el.innerHTML = '<p class="profile-empty">Could not load collections.</p>';
-    });
-  }
-
-  function renderProfileCollections(collections) {
-    var el = document.getElementById('profile-collections');
-    if (!el) return;
-    if (!collections.length) {
-      el.innerHTML = '<p class="profile-empty">No collections yet.</p>';
-      return;
-    }
-    el.innerHTML = collections.map(function (c) {
-      var itemLabel = c.item_count === 1 ? '1 work' : (c.item_count || 0) + ' works';
-      return '<div class="coll-profile-row" data-id="' + c.id + '">' +
-        '<span class="coll-profile-title">' + esc(c.title) + '</span>' +
-        '<span class="coll-profile-count">' + itemLabel + '</span>' +
-      '</div>';
-    }).join('');
-
-    el.querySelectorAll('.coll-profile-row').forEach(function (row) {
-      row.addEventListener('click', function () {
-        showView('view-collections');
-        openCollection(parseInt(row.dataset.id, 10));
-      });
-    });
-  }
-
-  document.getElementById('coll-back').addEventListener('click', function () {
-    showCollectionsList();
-    loadCollections();
-  });
-
-  document.getElementById('coll-create-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var titleInput = document.getElementById('coll-title-input');
-    var descInput = document.getElementById('coll-desc-input');
-    var submitBtn = e.target.querySelector('button[type="submit"]');
-    var title = titleInput.value.trim();
-    var description = descInput.value.trim();
-    if (!title) return;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Creating…';
-    api('/api/collections', {
-      method: 'POST',
-      body: JSON.stringify({ title: title, description: description }),
-    }).then(function (resp) {
-      titleInput.value = '';
-      descInput.value = '';
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Create collection';
-      if (resp && resp.collection) return openCollection(resp.collection.id);
-    }).catch(function (err) {
-      console.error('Create collection error:', err);
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Create collection';
-    });
-
-  // ── Artwork detail view ────────────────────────────────────────────────────
-  var artworkCurrent = {};
-
-  function openArtwork(saleId, title, createdAt, artistUserId, artistUsername) {
-    artworkCurrent = { saleId: saleId, title: title, createdAt: createdAt, artistUserId: artistUserId, artistUsername: artistUsername };
-    showView('view-artwork');
-    document.getElementById('artwork-title').textContent = title || 'Untitled';
-    var dateEl = document.getElementById('artwork-date');
-    var dateStr = createdAt ? formatStamp(createdAt) : '';
-    dateEl.textContent = dateStr ? 'Recorded ' + dateStr : '';
-    var artistBtn = document.getElementById('artwork-artist-btn');
-    artistBtn.textContent = artistUsername || 'Artist';
-    document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2);font-size:0.85rem">Loading…</span>';
-    document.getElementById('artwork-comments-list').innerHTML = '';
-    document.getElementById('artwork-comment-form-wrap').innerHTML = '';
-
-    Promise.all([
-      api('/api/artworks/' + saleId + '/reactions'),
-      api('/api/artworks/' + saleId + '/comments'),
-    ]).then(function (results) {
-      renderArtworkReactions(saleId, results[0]);
-      renderArtworkComments(saleId, results[1]);
-    }).catch(function (err) {
-      console.error('Artwork load error:', err);
-      document.getElementById('artwork-reactions').innerHTML = '<span style="color:var(--ink-2)">Could not load reactions.</span>';
-    });
-  }
-
-  function renderArtworkReactions(saleId, data) {
-    var counts = (data && data.counts) || {};
-    var myEmoji = (data && data.myEmoji) || null;
-    var emojis = ['❤️', '🔥', '👏', '✨', '🎨'];
-    var el = document.getElementById('artwork-reactions');
-    el.innerHTML = emojis.map(function (emoji) {
-      var count = counts[emoji] || 0;
-      var active = emoji === myEmoji ? ' active' : '';
-      return '<button class="reaction-btn' + active + '" data-emoji="' + esc(emoji) + '">' +
-        emoji + ' <span class="reaction-count">' + count + '</span>' +
-      '</button>';
-    }).join('');
-    el.querySelectorAll('.reaction-btn').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var emoji = btn.dataset.emoji;
-        api('/api/artworks/' + saleId + '/reactions', {
-          method: 'POST',
-          body: JSON.stringify({ emoji: emoji }),
-        }).then(function (res) {
-          renderArtworkReactions(saleId, res);
-        }).catch(function (err) {
-          console.error('Reaction error:', err);
-        });
-      });
-    });
-  }
-
-  function renderArtworkComments(saleId, data) {
-    var comments = (data && data.comments) || [];
-    var listEl = document.getElementById('artwork-comments-list');
-    var formWrap = document.getElementById('artwork-comment-form-wrap');
-
-    if (!comments.length) {
-      listEl.innerHTML = '<p class="profile-empty">No comments yet.</p>';
-    } else {
-      listEl.innerHTML = comments.map(function (c) {
-        return '<div class="comment-item">' +
-          '<div class="comment-header">' +
-            '<button class="comment-author" data-uid="' + esc(String(c.user_id)) + '" data-uname="' + esc(c.username) + '">' + esc(c.username) + '</button>' +
-            '<span class="comment-timestamp">' + esc(formatStamp(c.created_at) || '') + '</span>' +
-          '</div>' +
-          '<div class="comment-body">' + esc(c.body) + '</div>' +
-        '</div>';
-      }).join('');
-      listEl.querySelectorAll('.comment-author').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          openProfile(parseInt(btn.dataset.uid, 10), btn.dataset.uname);
-        });
-      });
-    }
-
-    if (currentUserId) {
-      formWrap.innerHTML =
-        '<form class="comment-form" id="artwork-comment-form">' +
-          '<textarea placeholder="Add a comment…" maxlength="500" rows="2" required></textarea>' +
-          '<div class="comment-form-row"><button type="submit">Post</button></div>' +
-        '</form>';
-      document.getElementById('artwork-comment-form').addEventListener('submit', function (e) {
-        e.preventDefault();
-        var textarea = e.target.querySelector('textarea');
-        var submitBtn = e.target.querySelector('button[type="submit"]');
-        var body = textarea.value.trim();
-        if (!body) return;
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Posting…';
-        api('/api/artworks/' + saleId + '/comments', {
-          method: 'POST',
-          body: JSON.stringify({ body: body }),
-        }).then(function () {
-          textarea.value = '';
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Post';
-          return api('/api/artworks/' + saleId + '/comments');
-        }).then(function (res) {
-          renderArtworkComments(saleId, res);
-        }).catch(function (err) {
-          console.error('Comment error:', err);
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Post';
-        });
-      });
-    } else {
-      formWrap.innerHTML = '<p class="comment-signin-hint">Sign in to comment.</p>';
-    }
-  }
-
-  document.getElementById('artwork-back').addEventListener('click', function () {
-    showView('view-profile');
-  });
-
-  document.getElementById('artwork-artist-btn').addEventListener('click', function () {
-    if (artworkCurrent.artistUserId) {
-      openProfile(artworkCurrent.artistUserId, artworkCurrent.artistUsername);
-    }
-  });
-
   // ── View switching ─────────────────────────────────────────────────────────
   function showView(viewId) {
-    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-profile', 'view-collections', 'view-artwork'].forEach(function (id) {
+    ['view-gate', 'view-welcome', 'view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'].forEach(function (id) {
       var el = document.getElementById(id);
       if (id === viewId) {
         el.classList.remove('hidden');
@@ -3735,18 +2651,6 @@
     document.getElementById('tab-forum').classList.toggle('active', viewId === 'view-forum');
     document.getElementById('tab-messages').classList.toggle('active', viewId === 'view-messages');
     document.getElementById('tab-web').classList.toggle('active', viewId === 'view-web');
-    document.getElementById('tab-collections').classList.toggle('active', viewId === 'view-collections');
-
-    var VIEW_TITLES = {
-      'view-dash': 'Dashboard',
-      'view-ledger': 'Ledger',
-      'view-forum': 'Forum',
-      'view-messages': 'Messages',
-      'view-web': 'Desktop access',
-      'view-collections': 'Collections',
-    };
-    var titleEl = document.getElementById('mob-header-title');
-    if (titleEl && VIEW_TITLES[viewId]) titleEl.textContent = VIEW_TITLES[viewId];
   }
 
   // ── Tab listeners ──────────────────────────────────────────────────────────
@@ -3773,12 +2677,6 @@
 
   document.getElementById('tab-web').addEventListener('click', function () {
     showView('view-web');
-  });
-
-  document.getElementById('tab-collections').addEventListener('click', function () {
-    showView('view-collections');
-    showCollectionsList();
-    loadCollections();
   });
 
   // ── Dashboard load ─────────────────────────────────────────────────────────
@@ -4060,25 +2958,20 @@
         resultEl.innerHTML =
           '<p class="web-access-line">Sign in on a computer at ' +
             '<span class="web-access-url">' + esc(loginUrl) + '</span></p>' +
-          '<p class="web-access-line">Username for the login page: <span class="web-access-user">' + esc(uname) + '</span></p>' +
+          '<p class="web-access-line">Username: <span class="web-access-user">' + esc(uname) + '</span></p>' +
           '<p class="web-access-line">Code: <span class="web-access-code">' + esc(code) + '</span></p>' +
           (magicUrl
-            ? '<p class="web-access-note">Tap <strong>Open in new tab</strong> to sign in instantly, or copy the link and paste it in Safari/Chrome.</p>' +
-              '<p class="web-access-note">If the link has expired, go to the address above and enter the username and code shown here.</p>'
+            ? '<p class="web-access-note">Tap Copy link, then open your phone\'s browser (Safari/Chrome) or a computer and paste — you\'ll be signed straight into your studio to upload images.</p>'
             : '') +
           '<div class="web-access-actions">' +
             '<button type="button" class="web-access-copy" id="web-access-copy-code">Copy code</button>' +
             (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-copy-link">Copy link</button>' : '') +
-            (magicUrl ? '<button type="button" class="web-access-copy" id="web-access-open-tab">Open in new tab</button>' : '') +
           '</div>' +
           (magicUrl ? '' : '<p class="web-access-note">This replaces any code you generated before.</p>');
 
         bindCopyButton(document.getElementById('web-access-copy-code'), code, 'Copy code');
         if (magicUrl) {
           bindCopyButton(document.getElementById('web-access-copy-link'), magicUrl, 'Copy link');
-          document.getElementById('web-access-open-tab').addEventListener('click', function () {
-            window.open(magicUrl, '_blank');
-          });
         }
 
         resultEl.classList.remove('hidden');
@@ -4104,14 +2997,6 @@
   var MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
   var avatarChangeBtn = document.getElementById('avatar-change-btn');
   var avatarFileInput = document.getElementById('avatar-file');
-
-  // Clicking your own dashboard avatar opens your profile.
-  var dashAvatar = document.getElementById('avatar');
-  if (dashAvatar) {
-    dashAvatar.addEventListener('click', function () {
-      if (currentUserId) openProfile(currentUserId, null);
-    });
-  }
 
   function showAvatarError(msg) {
     var errEl = document.getElementById('avatar-error');
@@ -4191,7 +3076,7 @@
   }
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
-  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web', 'view-collections'];
+  var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'];
   var navCurrentIdx = 0;
 
   function updateMobNav(idx) {
@@ -4227,7 +3112,6 @@
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
-    if (viewId === 'view-collections') { showCollectionsList(); loadCollections(); }
   });
 
   document.getElementById('mob-nav-next-btn').addEventListener('click', function () {
@@ -4239,7 +3123,6 @@
     if (viewId === 'view-ledger') renderLedger(cachedLedger);
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
-    if (viewId === 'view-collections') { showCollectionsList(); loadCollections(); }
   });
 
   // Keep the mobile nav in sync when header tabs are clicked
