@@ -641,6 +641,24 @@
       color: var(--paper);
     }
 
+    /* ── Proposal outcome badge ── */
+    .proposal-outcome {
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.3rem 0;
+      margin-bottom: 0.55rem;
+    }
+    .outcome-passed { color: var(--ok); }
+    .outcome-not-passed { color: var(--ink-2); }
+
+    /* ── Fee status line ── */
+    #fee-status {
+      margin-bottom: 0.9rem;
+      font-size: 0.84rem;
+      color: var(--ink-2);
+    }
+    #stat-fee { color: var(--ink); }
+
     /* ── Sales panel ── */
     .sales-list { margin-bottom: 0; }
 
@@ -1704,6 +1722,8 @@
   var cachedLedger = [];
   var dbSales = [];
   var dbEnrolments = [];
+  var currentFeePct = 10;
+  var _proposalPoll = null;
   // The platform fee is governed by the Fee Split proposal (see renderFeeStatus).
   // Initialised to the default fee and overwritten with the live value from
   // /api/platform once the dashboard loads, so newly recorded sales use the
@@ -1996,8 +2016,9 @@
   }
 
   // ── Render: proposals ─────────────────────────────────────────────────────
-  function renderProposals(proposals) {
+  function renderProposals(proposals, feePct) {
     var el = document.getElementById('proposals-list');
+    var pct = feePct != null ? feePct : currentFeePct;
     if (!proposals.length) {
       el.innerHTML = '<p class="proposal-desc">No proposals yet.</p>';
       return;
@@ -2008,6 +2029,16 @@
       var total = forCount + againstCount;
       var forPct = total > 0 ? Math.round(forCount / total * 100) : 50;
       var againstPct = 100 - forPct;
+
+      var badgeHtml = '';
+      if (p.fee_value != null && total >= 2) {
+        if (forCount > againstCount) {
+          badgeHtml = '<div class="proposal-outcome outcome-passed">Passed — fee updated to ' + p.fee_value + '%</div>';
+        } else {
+          badgeHtml = '<div class="proposal-outcome outcome-not-passed">Not passed — fee stays ' + pct + '%</div>';
+        }
+      }
+
       return '<div class="proposal">' +
         '<div class="proposal-title">' + esc(p.title) + '</div>' +
         '<p class="proposal-desc">' + esc(p.description || '') + '</p>' +
@@ -2019,6 +2050,7 @@
           '<span class="for-count">' + forCount + ' Yes</span>' +
           '<span class="against-count">' + againstCount + ' No</span>' +
         '</div>' +
+        badgeHtml +
         '<div class="vote-buttons">' +
           '<button class="vote-btn for-btn' + (p.my_vote === 'for' ? ' active' : '') +
             '" data-id="' + p.id + '" data-dir="for">Yes</button>' +
@@ -2154,12 +2186,25 @@
       if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
       return Promise.all([api('/api/proposals'), api('/api/platform')]);
     }).then(function (results) {
-      renderProposals(results[0].proposals);
+      var platform = results[1] || {};
+      if (platform.feePercent != null) currentFeePct = Number(platform.feePercent);
+      renderProposals(results[0].proposals, currentFeePct);
       renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
     }).catch(function (err) {
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
     });
+  }
+
+  // ── Proposal poller ────────────────────────────────────────────────────────
+  function pollProposals() {
+    Promise.all([api('/api/proposals'), api('/api/platform')]).then(function (results) {
+      var proposals = (results[0] && results[0].proposals) || [];
+      var platform = results[1] || {};
+      if (platform.feePercent != null) currentFeePct = Number(platform.feePercent);
+      renderFeeStatus(results[1]);
+      renderProposals(proposals, currentFeePct);
+    }).catch(function () {});
   }
 
   // ── Refresh dashboard panels from the DB source of truth ─────────────────────
@@ -2203,7 +2248,7 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Recording…';
 
-    var fee = Math.round(amount * GALLERY_FEE_RATE);
+    var fee = Math.round(amount * (currentFeePct / 100));
     var memo = 'sale:' + title + ':' + amount + ':' + fee;
 
     // 1) Persist the sale in the DB (source of truth) — this always "sticks".
@@ -2696,16 +2741,22 @@
       cachedLedger = parseTxs(results[3] || []);
       var artist = results[4] || { sales: [], portrait: '' };
       var me = results[5] || {};
+      var platform = results[6] || {};
       currentUserId = me.id || 0;
+      currentFeePct = platform.feePercent != null ? Number(platform.feePercent) : 10;
 
       renderFeeStatus(results[6]);
-      renderProposals(proposals);
+      renderProposals(proposals, currentFeePct);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
       renderSales(artist.sales || []);
       renderAvatar(artist.portrait);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
       loadDmUnreadCount();
+
+      // Start live tally polling while dashboard is visible.
+      clearInterval(_proposalPoll);
+      _proposalPoll = setInterval(pollProposals, 15000);
     }).catch(function (err) {
       console.error('Dashboard load error:', err);
     });
@@ -3125,12 +3176,17 @@
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
 
-  // Keep the mobile nav in sync when header tabs are clicked
+  // Keep the mobile nav in sync when header tabs are clicked; manage polling.
   var _origShowView = showView;
   showView = function (viewId) {
     _origShowView(viewId);
     var idx = NAV_PAGES.indexOf(viewId);
     if (idx !== -1) updateMobNav(idx);
+    // Stop polling when leaving the dashboard; start (or keep) it when entering.
+    clearInterval(_proposalPoll);
+    if (viewId === 'view-dash') {
+      _proposalPoll = setInterval(pollProposals, 15000);
+    }
   };
 
   // ── Init ───────────────────────────────────────────────────────────────────
