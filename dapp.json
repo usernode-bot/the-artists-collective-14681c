@@ -75,6 +75,21 @@
       "name": "Fee Split outcome badge renders",
       "path": "/?demo=1",
       "expectSelector": ".proposal-outcome"
+    },
+    {
+      "name": "Per-proposal outcome badge renders",
+      "path": "/?demo=1",
+      "expectSelector": ".proposal .proposal-outcome"
+    },
+    {
+      "name": "Decided proposal shows Not passed badge",
+      "path": "/?demo=1",
+      "expectText": "Not passed"
+    },
+    {
+      "name": "Undecided proposal shows Voting open badge",
+      "path": "/?demo=1",
+      "expectText": "Voting open"
     }
   ]
 }

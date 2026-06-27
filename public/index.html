@@ -567,12 +567,19 @@
       background: color-mix(in srgb, var(--accent) 12%, transparent);
     }
 
+    .proposal-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.4rem;
+    }
     .proposal-title {
       font-family: var(--serif);
       font-size: 1.05rem;
       font-weight: 600;
       margin-bottom: 0.4rem;
     }
+    .proposal-head .proposal-title { margin-bottom: 0; }
 
     .proposal-desc {
       font-size: 0.84rem;
@@ -1710,18 +1717,26 @@
   // governed rate. 0.20 = the 20% default before any vote passes.
   var GALLERY_FEE_RATE = 0.20;
   var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
+  // The collective's governance wallet. Every vote is sent here (amount 1, the
+  // bridge's default nonzero fee) with a JSON memo the backend reads to tally
+  // and record results on-chain. Must stay byte-for-byte.
+  var GOV_ADDR = 'ut1z702sqef7snekt9u04m8uz73n9uzrrfqemf48ufzxmemhxgqgjsss5ldv8';
 
   // ── Chain-write notice ───────────────────────────────────────────────────────
   // Shown when a DB write succeeded but the best-effort on-chain receipt could
   // not be posted (e.g. the wallet holds no spendable base-currency balance).
   var _noticeTimer = null;
-  function showChainNotice(msg) {
+  // persist=true keeps the notice up until explicitly cleared — used for the
+  // "recording your vote on-chain…" indicator, which clears on confirmation
+  // (the send promise resolving), never on a timer.
+  function showChainNotice(msg, persist) {
     var el = document.getElementById('chain-notice');
     if (!el) return;
     if (_noticeTimer) { clearTimeout(_noticeTimer); _noticeTimer = null; }
     if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
     el.textContent = msg;
     el.classList.remove('hidden');
+    if (persist) return;
     _noticeTimer = setTimeout(function () {
       el.classList.add('hidden');
       el.textContent = '';
@@ -2008,8 +2023,18 @@
       var total = forCount + againstCount;
       var forPct = total > 0 ? Math.round(forCount / total * 100) : 50;
       var againstPct = 100 - forPct;
+      // Per-proposal sticky outcome badge — same rule + styles as the Fee Split
+      // badge: open → "Voting open"; passed → "Passed"; failed → "Not passed".
+      var status = p.status || 'open';
+      var decided = status === 'passed' || status === 'failed';
+      var badgeClass = status === 'passed' ? ' is-passed' : status === 'failed' ? ' is-failed' : '';
+      var badgeText = status === 'passed' ? 'Passed' : status === 'failed' ? 'Not passed' : 'Voting open';
+      var dis = decided ? ' disabled' : '';
       return '<div class="proposal">' +
-        '<div class="proposal-title">' + esc(p.title) + '</div>' +
+        '<div class="proposal-head">' +
+          '<div class="proposal-title">' + esc(p.title) + '</div>' +
+          '<span class="proposal-outcome' + badgeClass + '">' + badgeText + '</span>' +
+        '</div>' +
         '<p class="proposal-desc">' + esc(p.description || '') + '</p>' +
         '<div class="vote-bar-wrap">' +
           '<div class="vote-bar-for" style="width:' + forPct + '%"></div>' +
@@ -2021,9 +2046,9 @@
         '</div>' +
         '<div class="vote-buttons">' +
           '<button class="vote-btn for-btn' + (p.my_vote === 'for' ? ' active' : '') +
-            '" data-id="' + p.id + '" data-dir="for">Yes</button>' +
+            '" data-id="' + p.id + '" data-dir="for"' + dis + '>Yes</button>' +
           '<button class="vote-btn against-btn' + (p.my_vote === 'against' ? ' active' : '') +
-            '" data-id="' + p.id + '" data-dir="against">No</button>' +
+            '" data-id="' + p.id + '" data-dir="against"' + dis + '>No</button>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -2143,19 +2168,41 @@
 
     allBtns.forEach(function (b) { b.disabled = true; });
 
-    // DB write first (source of truth), then a best-effort on-chain receipt.
+    // 1) DB write is the source of truth. 2) Refresh the tally + badges from the
+    // DB immediately so the new count and any just-decided outcome show at once.
+    // 3) Fire the real on-chain send to the governance address in the background,
+    //    behind a "recording your vote on-chain…" indicator that clears when the
+    //    transaction confirms (the send promise resolving) — no timer/countdown.
     api('/api/votes', {
       method: 'POST',
       body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
     }).then(function () {
-      var memo = 'vote:' + proposalId + ':' + (direction === 'for' ? 'yes' : 'no');
-      return bridgeSend(userAddr, 1, memo);
-    }).then(function (result) {
-      if (NATIVE && !result) showChainNotice(NO_BALANCE_MSG);
       return Promise.all([api('/api/proposals'), api('/api/platform')]);
     }).then(function (results) {
       renderProposals(results[0].proposals);
       renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
+
+      // Best-effort on-chain receipt. memo is the exact JSON string the backend
+      // tallies — byte-for-byte {"app":"acg","type":"vote","proposal":<id>,
+      // "choice":"yes"|"no","voter":"<addr>"}. The send goes to GOV_ADDR, amount
+      // 1, with the bridge's default (nonzero) fee — never a literal 0.
+      var choice = direction === 'for' ? 'yes' : 'no';
+      var memo = JSON.stringify({ app: 'acg', type: 'vote', proposal: proposalId, choice: choice, voter: userAddr });
+      showChainNotice('Recording your vote on-chain…', true);
+      bridgeSend(GOV_ADDR, 1, memo).then(function (result) {
+        showChainNotice(''); // confirmed (or demo) — clear the indicator
+        if (NATIVE && !result) { showChainNotice(NO_BALANCE_MSG); return; }
+        var hash = result && (result.hash || result.id || result.txid);
+        if (hash) {
+          api('/api/votes/' + proposalId + '/tx', {
+            method: 'POST',
+            body: JSON.stringify({ tx_hash: hash }),
+          }).catch(function () { /* receipt persistence is best-effort */ });
+        }
+      }).catch(function (err) {
+        console.warn('vote send error:', err);
+        showChainNotice('');
+      });
     }).catch(function (err) {
       console.error('Vote error:', err);
       allBtns.forEach(function (b) { b.disabled = false; });
