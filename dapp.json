@@ -90,6 +90,16 @@
       "name": "Undecided proposal shows Voting open badge",
       "path": "/?demo=1",
       "expectText": "Voting open"
+    },
+    {
+      "name": "Ledger Sales sub-tab renders",
+      "path": "/?demo=1",
+      "expectSelector": "#ledger-subtab-sales"
+    },
+    {
+      "name": "Ledger Votes & Decisions sub-tab renders",
+      "path": "/?demo=1",
+      "expectSelector": "#ledger-subtab-gov"
     }
   ]
 }

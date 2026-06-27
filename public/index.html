@@ -898,6 +898,35 @@
 
     .pill-join { background: var(--pill-join-bg); color: var(--ok); }
     .pill-sale { background: var(--pill-sale-bg); color: var(--accent); }
+    .pill-canonical { background: var(--pill-join-bg); color: var(--ok); }
+
+    /* Ledger sub-tabs (Sales / Votes & Decisions) — reuse the ledger look. */
+    .ledger-subtabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+      border-bottom: 1px solid var(--line);
+    }
+    .ledger-subtab {
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      padding: 0.5rem 0.25rem;
+      margin-bottom: -1px;
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--ink-2);
+      cursor: pointer;
+    }
+    .ledger-subtab:hover { color: var(--ink); }
+    .ledger-subtab.active {
+      color: var(--ink);
+      border-bottom-color: var(--accent);
+    }
+
+    .ledger-tx { text-decoration: none; }
+    .ledger-tx:hover { text-decoration: underline; }
 
     .ledger-desc em { font-family: var(--serif); font-style: italic; }
 
@@ -1555,20 +1584,47 @@
     <h1>On-chain ledger</h1>
     <p class="subtitle">Gallery events recorded on the Usernode blockchain.</p>
   </div>
-  <table class="ledger-table">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-        <th>Tx hash</th>
-        <th>Nodes</th>
-        <th>Time</th>
-      </tr>
-    </thead>
-    <tbody id="ledger-body">
-      <tr><td colspan="5" class="ledger-empty">Loading…</td></tr>
-    </tbody>
-  </table>
+  <div class="ledger-subtabs">
+    <button id="ledger-subtab-sales" class="ledger-subtab active">Sales</button>
+    <button id="ledger-subtab-gov" class="ledger-subtab">Votes &amp; Decisions</button>
+  </div>
+
+  <!-- Sub-tab: Sales -->
+  <div id="ledger-sales-panel">
+    <table class="ledger-table">
+      <thead>
+        <tr>
+          <th>Artwork</th>
+          <th>Price</th>
+          <th>Artist net / fee</th>
+          <th>Artist</th>
+          <th>Tx</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="ledger-sales-body">
+        <tr><td colspan="6" class="ledger-empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Sub-tab: Votes & Decisions -->
+  <div id="ledger-gov-panel" class="hidden">
+    <table class="ledger-table">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Detail</th>
+          <th>Result / Choice</th>
+          <th>Status</th>
+          <th>Tx</th>
+        </tr>
+      </thead>
+      <tbody id="ledger-gov-body">
+        <tr><td colspan="5" class="ledger-empty">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <!-- View: Forum -->
@@ -1708,7 +1764,6 @@
   var userAddr = '';
   var currentUserId = 0;
   var currentDmConvId = null;
-  var cachedLedger = [];
   var dbSales = [];
   var dbEnrolments = [];
   // The platform fee is governed by the Fee Split proposal (see renderFeeStatus).
@@ -1778,36 +1833,9 @@
     return Promise.resolve('ut1demo' + suffix);
   }
 
-  function normalizeTx(raw) {
-    return {
-      hash:      raw.hash       || raw.id           || raw.txid         || '',
-      from:      raw.from       || raw.sender        || raw.senderAddress || '',
-      timestamp: raw.timestamp  != null ? raw.timestamp
-                 : raw.t        != null ? raw.t
-                 : raw.created_at != null ? raw.created_at
-                 : raw.time     != null ? raw.time
-                 : (Date.now() / 1000 | 0),
-      nodeCount: raw.nodeCount  != null ? raw.nodeCount
-                 : raw.n        != null ? raw.n
-                 : raw.node_count != null ? raw.node_count : 0,
-      memo:      raw.memo || raw.data || raw.note || '',
-      amount:    raw.amount != null ? raw.amount : raw.value != null ? raw.value : 0,
-    };
-  }
-
-  function bridgeGetTxs() {
-    if (NATIVE) {
-      // Query without recipient filter to get all collective chain events.
-      return window.getTransactions({ limit: 100 }).then(function (result) {
-        var arr = Array.isArray(result) ? result : (result && result.transactions) || [];
-        return arr.map(normalizeTx);
-      }).catch(function (err) {
-        console.warn('getTransactions error:', err);
-        return [];
-      });
-    }
-    return Promise.resolve(MOCK_TXS);
-  }
+  // The Ledger tab reads the collective's live on-chain ledger APIs directly
+  // (see loadLedger / renderLedgerSales / renderLedgerGov) — no bridge /
+  // getTransactions path is involved.
 
   // Fetch the artist record for the connected wallet from the collective's
   // public website API. Surfaces both the sales feed (for the "Your sales"
@@ -1888,53 +1916,6 @@
     }
     console.log('[demo] sendTransaction', { dest: dest, amount: amount, memo: memo });
     return Promise.resolve({ hash: 'demo-tx-' + Math.random().toString(36).slice(2, 10) });
-  }
-
-  // ── Mock data ──────────────────────────────────────────────────────────────
-  var NOW = Math.floor(Date.now() / 1000);
-  var MOCK_TXS = [
-    { memo: 'sale:Staging demo — Autumn Light #1:450:45',  amount: 1, timestamp: NOW - 3600,   nodeCount: 12, hash: 'abc123def456aa01', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Blue Resonance #7:280:28', amount: 1, timestamp: NOW - 7200,  nodeCount: 8,  hash: 'bcd234efa567bb02', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg1abc', amount: 1, timestamp: NOW - 86400,    nodeCount: 5,  hash: 'cde345fab678cc03', from: 'ut1stg1abc' },
-    { memo: 'sale:Staging demo — Quiet Tide #3:620:62',    amount: 1, timestamp: NOW - 172800, nodeCount: 15, hash: 'def456abc789dd04', from: 'ut1stg1abc' },
-    { memo: 'artist:enrol:ut1stg2def', amount: 1, timestamp: NOW - 259200,   nodeCount: 3,  hash: 'efa567bcd890ee05', from: 'ut1stg2def' },
-    { memo: 'artist:enrol:ut1stg3ghi', amount: 1, timestamp: NOW - 345600,   nodeCount: 6,  hash: 'fab678cde901ff06', from: 'ut1stg3ghi' },
-    { memo: 'artist:enrol:ut1stg4jkl', amount: 1, timestamp: NOW - 432000,   nodeCount: 2,  hash: 'abc789def012gg07', from: 'ut1stg4jkl' },
-  ];
-
-  // ── Ledger parsing ─────────────────────────────────────────────────────────
-  function parseTxs(txs) {
-    return txs.reduce(function (acc, tx) {
-      var memo = tx.memo || '';
-      var n = tx.nodeCount != null ? tx.nodeCount : (tx.n != null ? tx.n : 0);
-      var t = tx.timestamp != null ? tx.timestamp : (tx.t != null ? tx.t : Math.floor(Date.now() / 1000));
-      var hash = tx.hash || tx.id || '';
-      var from = tx.from || tx.sender || '';
-
-      if (memo.startsWith('artist:enrol:')) {
-        var addr = memo.slice('artist:enrol:'.length).trim();
-        acc.push({ type: 'join', who: addr, amt: null, n: n, t: t, hash: hash, from: from });
-      } else if (memo.startsWith('sale:')) {
-        var parts = memo.split(':');
-        if (parts.length >= 3) {
-          var price, fee, title;
-          if (parts.length >= 4 && !isNaN(parseFloat(parts[parts.length - 2]))) {
-            // New format: sale:<title>:<price>:<fee>
-            fee   = parseFloat(parts[parts.length - 1]);
-            price = parseFloat(parts[parts.length - 2]);
-            title = parts.slice(1, -2).join(':');
-          } else {
-            // Legacy format: sale:<title>:<price>
-            price = parseFloat(parts[parts.length - 1]);
-            fee   = 0;
-            title = parts.slice(1, -1).join(':');
-          }
-          acc.push({ type: 'sale', title: title, amt: isNaN(price) ? 0 : price, fee: isNaN(fee) ? 0 : fee, n: n, t: t, hash: hash, from: from });
-        }
-      }
-      // vote memos are silently skipped
-      return acc;
-    }, []);
   }
 
   function truncAddr(addr) {
@@ -2134,29 +2115,129 @@
     '</div>';
   }
 
-  // ── Render: ledger ────────────────────────────────────────────────────────
-  function renderLedger(ledger) {
-    var tbody = document.getElementById('ledger-body');
-    if (!ledger.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="ledger-empty">No on-chain events yet.</td></tr>';
+  // ── Ledger (live on-chain data) ────────────────────────────────────────────
+  // The Ledger tab reads two public, read-only, CORS-open GET APIs on the
+  // collective's website — no wallet/bridge needed. Sales come from /api/ledger;
+  // governance decisions + individual votes from /api/ledger-governance (which
+  // also returns explorer_ui, reused to build Sales tx links too).
+  var LEDGER_SALES_URL = 'https://artists-collective.pages.dev/api/ledger';
+  var LEDGER_GOV_URL = 'https://artists-collective.pages.dev/api/ledger-governance';
+  var EXPLORER_UI_FALLBACK = 'https://explorer.testnet.usernodelabs.org';
+
+  // Parse a timestamp (epoch seconds/ms or ISO string) to ms for sorting.
+  function ledgerTs(at) {
+    if (at == null) return 0;
+    if (typeof at === 'number') return at > 1e12 ? at : at * 1000;
+    var n = Date.parse(at);
+    if (!isNaN(n)) return n;
+    var num = Number(at);
+    return isNaN(num) ? 0 : (num > 1e12 ? num : num * 1000);
+  }
+
+  function explorerTxLink(explorerUi, txId) {
+    if (!txId) return '<span class="mono">—</span>';
+    var base = String(explorerUi || EXPLORER_UI_FALLBACK).replace(/\/+$/, '');
+    var url = base + '/txs/' + encodeURIComponent(txId);
+    var disp = String(txId).length > 10 ? String(txId).slice(0, 8) + '…' : String(txId);
+    return '<a class="mono ledger-tx" href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(disp) + '</a>';
+  }
+
+  function canonicalBadge() {
+    return '<span class="pill pill-canonical">canonical ✓</span>';
+  }
+
+  function shortHandle(handle, addr) {
+    if (handle) {
+      var h = String(handle);
+      return h.length > 18 ? h.slice(0, 16) + '…' : h;
+    }
+    return truncAddr(addr);
+  }
+
+  // Fetch both ledger feeds and render both sub-tab panels. Each fetch degrades
+  // to an empty feed on any error so one failure never blanks the whole tab.
+  function loadLedger() {
+    var govP = fetch(LEDGER_GOV_URL)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    var salesP = fetch(LEDGER_SALES_URL)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    return Promise.all([govP, salesP]).then(function (res) {
+      var gov = res[0] || {};
+      var sales = res[1] || {};
+      var explorerUi = gov.explorer_ui || EXPLORER_UI_FALLBACK;
+      renderLedgerSales((sales && sales.items) || [], explorerUi);
+      renderLedgerGov(gov, explorerUi);
+    });
+  }
+
+  function renderLedgerSales(items, explorerUi) {
+    var tbody = document.getElementById('ledger-sales-body');
+    if (!tbody) return;
+    var rows = (items || []).slice().sort(function (a, b) { return ledgerTs(b.at) - ledgerTs(a.at); });
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="ledger-empty">No on-chain records yet.</td></tr>';
       return;
     }
-    tbody.innerHTML = ledger.map(function (tx) {
-      var pill = tx.type === 'join'
-        ? '<span class="pill pill-join">Artist joined</span>'
-        : '<span class="pill pill-sale">Sale</span>';
-      var desc = tx.type === 'join'
-        ? '<span class="mono">' + esc(truncAddr(tx.who)) + '</span>'
-        : '<em>' + esc(tx.title) + '</em> — $' + tx.amt.toLocaleString();
-      var hashDisplay = tx.hash ? tx.hash.slice(0, 8) + '…' : '—';
+    tbody.innerHTML = rows.map(function (it) {
+      var price = Number(it.price || 0);
+      var net = Number(it.artist_net != null ? it.artist_net : 0);
+      var fee = Number(it.fee != null ? it.fee : 0);
       return '<tr>' +
-        '<td>' + pill + '</td>' +
-        '<td class="ledger-desc">' + desc + '</td>' +
-        '<td class="mono">' + esc(hashDisplay) + '</td>' +
-        '<td>' + tx.n + '</td>' +
-        '<td class="mono">' + formatTime(tx.t) + '</td>' +
+        '<td class="ledger-desc"><em>' + esc(it.title || 'Untitled') + '</em></td>' +
+        '<td>$' + price.toLocaleString() + '</td>' +
+        '<td class="mono">$' + net.toLocaleString() + ' net / $' + fee.toLocaleString() + ' fee</td>' +
+        '<td class="mono">' + esc(shortHandle(it.artist, it.artist_address)) + '</td>' +
+        '<td>' + explorerTxLink(explorerUi, it.tx_id) + '</td>' +
+        '<td>' + canonicalBadge() + '</td>' +
       '</tr>';
     }).join('');
+  }
+
+  function renderLedgerGov(gov, explorerUi) {
+    var tbody = document.getElementById('ledger-gov-body');
+    if (!tbody) return;
+    var decisions = ((gov && gov.decisions) || []).slice().sort(function (a, b) { return ledgerTs(b.at) - ledgerTs(a.at); });
+    var votes = ((gov && gov.votes) || []).slice().sort(function (a, b) { return ledgerTs(b.at) - ledgerTs(a.at); });
+    if (!decisions.length && !votes.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="ledger-empty">No on-chain records yet.</td></tr>';
+      return;
+    }
+    var html = '';
+    // Decisions first.
+    decisions.forEach(function (d) {
+      var passed = d.result === 'passed' || d.passed === true || d.status === 'passed';
+      var resultClass = passed ? 'pill-join' : 'pill-sale';
+      var resultLabel = passed ? 'Passed' : 'Not passed';
+      var yes = d.yes != null ? d.yes : (d.for_count != null ? d.for_count : 0);
+      var no = d.no != null ? d.no : (d.against_count != null ? d.against_count : 0);
+      var pid = d.proposal_id != null ? d.proposal_id : d.proposal;
+      var title = d.title || ('Proposal #' + (pid != null ? pid : '?'));
+      html += '<tr>' +
+        '<td><span class="pill pill-join">Decision</span></td>' +
+        '<td class="ledger-desc"><em>' + esc(title) + '</em></td>' +
+        '<td><span class="pill ' + resultClass + '">' + resultLabel + '</span> <span class="mono">' + esc(String(yes)) + '–' + esc(String(no)) + '</span></td>' +
+        '<td>' + canonicalBadge() + '</td>' +
+        '<td>' + explorerTxLink(explorerUi, d.tx_id || d.tx_hash) + '</td>' +
+      '</tr>';
+    });
+    // Individual votes after.
+    votes.forEach(function (v) {
+      var choice = v.choice || v.direction;
+      var isYes = choice === 'yes' || choice === 'for';
+      var choiceClass = isYes ? 'pill-join' : 'pill-sale';
+      var choiceLabel = isYes ? 'Yes' : 'No';
+      var pid = v.proposal != null ? v.proposal : v.proposal_id;
+      html += '<tr>' +
+        '<td><span class="pill pill-sale">Vote</span></td>' +
+        '<td class="ledger-desc">Proposal #' + esc(String(pid != null ? pid : '?')) + ' · <span class="mono">' + esc(truncAddr(v.voter || v.voter_address)) + '</span></td>' +
+        '<td><span class="pill ' + choiceClass + '">' + choiceLabel + '</span></td>' +
+        '<td>' + canonicalBadge() + '</td>' +
+        '<td>' + explorerTxLink(explorerUi, v.tx_id || v.tx_hash) + '</td>' +
+      '</tr>';
+    });
+    tbody.innerHTML = html;
   }
 
   // ── Vote handler ───────────────────────────────────────────────────────────
@@ -2210,27 +2291,23 @@
   }
 
   // ── Refresh dashboard panels from the DB source of truth ─────────────────────
-  // Sales / treasury / ownership / stats come from the DB; the Ledger tab is
-  // refreshed from the chain via getTransactions (which may be empty if the
-  // explorer read-back is unavailable — that's non-fatal).
+  // Sales / treasury / ownership / stats come from the DB. The Ledger tab has its
+  // own live data source (loadLedger) and is refreshed when that tab is opened.
   function refreshDashboard() {
     return Promise.all([
       api('/api/sales'),
       api('/api/enrolments'),
-      bridgeGetTxs(),
       fetchArtist(userAddr),
     ]).then(function (results) {
       dbSales = (results[0] && results[0].sales) || [];
       dbEnrolments = (results[1] && results[1].enrolments) || [];
-      cachedLedger = parseTxs(results[2] || []);
-      var artist = results[3] || { sales: [], portrait: '' };
+      var artist = results[2] || { sales: [], portrait: '' };
 
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
       renderSales(artist.sales || []);
       renderAvatar(artist.portrait);
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
-      renderLedger(cachedLedger);
     }).catch(function (err) {
       console.warn('refreshDashboard error:', err);
     });
@@ -2707,7 +2784,22 @@
 
   document.getElementById('tab-ledger').addEventListener('click', function () {
     showView('view-ledger');
-    renderLedger(cachedLedger);
+    loadLedger();
+  });
+
+  // Ledger sub-tabs: toggle the two panels. Data is already loaded by loadLedger.
+  function showLedgerSubtab(which) {
+    var sales = which === 'sales';
+    document.getElementById('ledger-subtab-sales').classList.toggle('active', sales);
+    document.getElementById('ledger-subtab-gov').classList.toggle('active', !sales);
+    document.getElementById('ledger-sales-panel').classList.toggle('hidden', !sales);
+    document.getElementById('ledger-gov-panel').classList.toggle('hidden', sales);
+  }
+  document.getElementById('ledger-subtab-sales').addEventListener('click', function () {
+    showLedgerSubtab('sales');
+  });
+  document.getElementById('ledger-subtab-gov').addEventListener('click', function () {
+    showLedgerSubtab('gov');
   });
 
   document.getElementById('tab-forum').addEventListener('click', function () {
@@ -2732,7 +2824,6 @@
       api('/api/proposals'),
       api('/api/sales'),
       api('/api/enrolments'),
-      bridgeGetTxs(),
       fetchArtist(userAddr),
       api('/api/me'),
       api('/api/platform'),
@@ -2740,12 +2831,11 @@
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
       dbEnrolments = (results[2] && results[2].enrolments) || [];
-      cachedLedger = parseTxs(results[3] || []);
-      var artist = results[4] || { sales: [], portrait: '' };
-      var me = results[5] || {};
+      var artist = results[3] || { sales: [], portrait: '' };
+      var me = results[4] || {};
       currentUserId = me.id || 0;
 
-      renderFeeStatus(results[6]);
+      renderFeeStatus(results[5]);
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
       renderSales(artist.sales || []);
@@ -3156,7 +3246,7 @@
     var viewId = NAV_PAGES[newIdx];
     showView(viewId);
     updateMobNav(newIdx);
-    if (viewId === 'view-ledger') renderLedger(cachedLedger);
+    if (viewId === 'view-ledger') loadLedger();
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
@@ -3167,7 +3257,7 @@
     var viewId = NAV_PAGES[newIdx];
     showView(viewId);
     updateMobNav(newIdx);
-    if (viewId === 'view-ledger') renderLedger(cachedLedger);
+    if (viewId === 'view-ledger') loadLedger();
     if (viewId === 'view-forum') { showForumList(); loadThreads(); }
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
