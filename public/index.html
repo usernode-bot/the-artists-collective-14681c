@@ -1896,7 +1896,7 @@
         return res.json().then(function (data) {
           return {
             sales: Array.isArray(data && data.sales) ? data.sales : [],
-            portrait: (data && data.portrait) || '',
+            portrait: (data && data.artist && data.artist.portrait) || '',
           };
         });
       })
