@@ -281,11 +281,27 @@ app.post('/api/avatar', async (req, res) => {
 // set, which proposal governs it, and a sticky outcome status. No blockchain:
 // the outcome is decided from the DB vote tally and persisted, so it survives
 // reloads and redeploys.
-const FEE_QUORUM = 4; // minimum total votes before the outcome is decided
+const VOTE_QUORUM = 4; // minimum total votes before any proposal outcome is decided
+
+// Tally a single proposal's votes. Returns { forCount, againstCount, total }.
+async function tallyProposal(proposalId) {
+  const tallyRes = await pool.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
+       COALESCE(SUM(CASE WHEN direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count
+     FROM votes WHERE proposal_id = $1`,
+    [proposalId]
+  );
+  const forCount = tallyRes.rows[0].for_count;
+  const againstCount = tallyRes.rows[0].against_count;
+  return { forCount, againstCount, total: forCount + againstCount };
+}
 
 // Recompute the fee outcome from the live vote tally. Only acts while status is
 // still 'open'; once 'passed'/'failed' it early-returns, making the result
-// persistent. On a pass, the proposed fee becomes the current fee.
+// persistent. On a pass, the proposed fee becomes the current fee. This handles
+// only the Fee Split proposal's extra side-effect on platform_settings;
+// per-proposal status lives on governance_proposals (see evaluateProposalOutcome).
 async function evaluateFeeOutcome() {
   const settingsRes = await pool.query(
     `SELECT fee_proposal_id, proposed_fee, status FROM platform_settings WHERE id = 1`
@@ -294,17 +310,8 @@ async function evaluateFeeOutcome() {
   const s = settingsRes.rows[0];
   if (s.status !== 'open' || !s.fee_proposal_id) return;
 
-  const tallyRes = await pool.query(
-    `SELECT
-       COALESCE(SUM(CASE WHEN direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
-       COALESCE(SUM(CASE WHEN direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count
-     FROM votes WHERE proposal_id = $1`,
-    [s.fee_proposal_id]
-  );
-  const forCount = tallyRes.rows[0].for_count;
-  const againstCount = tallyRes.rows[0].against_count;
-  const total = forCount + againstCount;
-  if (total < FEE_QUORUM) return; // not enough participation yet — stays open
+  const { forCount, againstCount, total } = await tallyProposal(s.fee_proposal_id);
+  if (total < VOTE_QUORUM) return; // not enough participation yet — stays open
 
   if (forCount > againstCount) {
     await pool.query(
@@ -312,6 +319,36 @@ async function evaluateFeeOutcome() {
     );
   } else {
     await pool.query(`UPDATE platform_settings SET status = 'failed' WHERE id = 1`);
+  }
+}
+
+// Generic per-proposal outcome evaluator. Mirrors the Fee Split rule for ALL
+// governance proposals: once a proposal reaches VOTE_QUORUM total votes it is
+// decided — 'passed' when Yes (for) outnumber No (against), else 'failed' — and
+// the result is sticky (early-returns once status is no longer 'open'). For the
+// proposal that governs the platform fee, also runs evaluateFeeOutcome() so the
+// fee→15% side-effect and the top fee badge keep working unchanged.
+async function evaluateProposalOutcome(proposalId) {
+  const propRes = await pool.query(
+    `SELECT status FROM governance_proposals WHERE id = $1`,
+    [proposalId]
+  );
+  if (!propRes.rows.length) return;
+  if (propRes.rows[0].status !== 'open') return; // sticky once decided
+
+  const { forCount, againstCount, total } = await tallyProposal(proposalId);
+  if (total < VOTE_QUORUM) return; // not enough participation yet — stays open
+
+  const outcome = forCount > againstCount ? 'passed' : 'failed';
+  await pool.query(
+    `UPDATE governance_proposals SET status = $1 WHERE id = $2`,
+    [outcome, proposalId]
+  );
+
+  // Fee Split proposal carries the extra platform_settings side-effect.
+  const feeRes = await pool.query(`SELECT fee_proposal_id FROM platform_settings WHERE id = 1`);
+  if (feeRes.rows.length && feeRes.rows[0].fee_proposal_id === Number(proposalId)) {
+    await evaluateFeeOutcome();
   }
 }
 
@@ -336,7 +373,7 @@ app.get('/api/proposals', async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        p.id, p.title, p.description, p.created_at, p.fee_value,
+        p.id, p.title, p.description, p.status, p.created_at, p.fee_value,
         COALESCE(SUM(CASE WHEN v.direction = 'for' THEN 1 ELSE 0 END), 0)::int AS for_count,
         COALESCE(SUM(CASE WHEN v.direction = 'against' THEN 1 ELSE 0 END), 0)::int AS against_count,
         MAX(CASE WHEN v.user_id = $1 THEN v.direction END) AS my_vote
@@ -363,12 +400,9 @@ app.post('/api/votes', async (req, res) => {
       ON CONFLICT (proposal_id, user_id)
       DO UPDATE SET direction = EXCLUDED.direction, created_at = NOW()
     `, [proposal_id, req.user.id, req.user.username, direction]);
-    // If this was a vote on the Fee Split proposal, re-evaluate whether the
-    // governed fee should now flip (sticky once decided).
-    const feeRes = await pool.query(`SELECT fee_proposal_id FROM platform_settings WHERE id = 1`);
-    if (feeRes.rows.length && feeRes.rows[0].fee_proposal_id === Number(proposal_id)) {
-      await evaluateFeeOutcome();
-    }
+    // Re-evaluate this proposal's outcome (sticky once decided). For the Fee
+    // Split proposal this also applies the fee→15% side-effect internally.
+    await evaluateProposalOutcome(Number(proposal_id));
     res.json({ ok: true, direction });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -380,6 +414,22 @@ app.get('/api/settings', async (req, res) => {
     const { rows } = await pool.query(`SELECT value FROM app_settings WHERE key = 'platform_fee_pct'`);
     const feePct = rows.length ? Number(rows[0].value) : 10;
     res.json({ platform_fee_pct: feePct });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Best-effort on-chain receipt for a vote (mirrors /api/sales/:id/tx). The vote
+// itself is already recorded in the DB; this just records the confirmed tx hash
+// of the governance-address send. Never surfaced in the Ledger.
+app.post('/api/votes/:proposal_id/tx', async (req, res) => {
+  const { tx_hash } = req.body || {};
+  try {
+    await pool.query(
+      `UPDATE votes SET tx_hash = $1 WHERE proposal_id = $2 AND user_id = $3`,
+      [tx_hash || null, req.params.proposal_id, req.user.id]
+    );
+    res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -754,6 +804,10 @@ async function start() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  // Per-proposal sticky outcome: 'open' until VOTE_QUORUM votes decide it,
+  // then 'passed' / 'failed'. Single source of truth for every proposal's
+  // result (the Fee Split proposal additionally mirrors into platform_settings).
+  await pool.query(`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'open'`);
 
   await pool.query(`ALTER TABLE governance_proposals ADD COLUMN IF NOT EXISTS fee_value NUMERIC DEFAULT NULL`);
 
@@ -768,6 +822,8 @@ async function start() {
       UNIQUE (proposal_id, user_id)
     )
   `);
+  // Best-effort on-chain receipt of the governance-address vote send.
+  await pool.query(`ALTER TABLE votes ADD COLUMN IF NOT EXISTS tx_hash VARCHAR(255)`);
 
   await pool.query(`COMMENT ON TABLE votes IS 'staging:private'`);
 
@@ -939,6 +995,16 @@ async function start() {
     ON CONFLICT (id) DO NOTHING
   `, [FEE_PROPOSAL_ID]);
 
+  // Boot-time back-fill (all environments): decide any proposal that already
+  // sits at/above quorum so its badge renders without waiting for a new vote.
+  // Sticky, so this is idempotent across reboots.
+  {
+    const { rows: allProps } = await pool.query(`SELECT id FROM governance_proposals`);
+    for (const { id } of allProps) {
+      await evaluateProposalOutcome(id);
+    }
+  }
+
   // ── Forum starter threads seed ──────────────────────────────────────────────
   // Seeded in all environments (product content; forum tables are public so a
   // fresh staging container starts empty until this runs). Idempotent via fixed
@@ -1005,10 +1071,12 @@ async function start() {
       [5, 9002, 'staging-artist-2', 'for'],
       [5, 9003, 'staging-artist-3', 'for'],
       [5, 9005, 'staging-artist-5', 'against'],
-      // Proposal 6 — open to outside collectors: leans No
+      // Proposal 6 — open to outside collectors: reaches quorum (4) with a No
+      // majority (1 Yes / 3 No) → decides as failed → "Not passed" badge.
       [6, 9001, 'staging-artist-1', 'against'],
       [6, 9003, 'staging-artist-3', 'against'],
       [6, 9004, 'staging-artist-4', 'for'],
+      [6, 9005, 'staging-artist-5', 'against'],
     ];
     for (const [pid, uid, uname, dir] of mockVotes) {
       await pool.query(`
@@ -1081,9 +1149,16 @@ async function start() {
     await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
     await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
 
-    // Resolve the Fee Split outcome from the seeded votes so the demo (/?demo=1)
-    // shows the passed state: fee updated to 15%, badge "Passed — fee updated to 15%".
-    await evaluateFeeOutcome();
+    // Resolve every proposal's outcome from the seeded votes so the demo
+    // (/?demo=1) shows a mix of badges: Fee Split (#1) and dividend (#4) Passed
+    // (Fee Split also updates the fee to 15%), outside-collectors (#6) Not
+    // passed, and marketing (#3) / featured-artist (#5) still Voting open.
+    {
+      const { rows: seededIds } = await pool.query(`SELECT id FROM governance_proposals`);
+      for (const { id } of seededIds) {
+        await evaluateProposalOutcome(id);
+      }
+    }
   }
 
   // Sync the effective fee to app_settings based on current vote tallies.
