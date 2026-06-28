@@ -1760,7 +1760,10 @@
   var params = new URLSearchParams(window.location.search);
   var TOKEN = params.get('token') || '';
   var HEADERS = TOKEN ? { 'x-usernode-token': TOKEN } : {};
-  var NATIVE = false;
+  // userAddr is the real wallet address from the platform bridge
+  // (window.getNodeAddress), or '' when there is genuinely no wallet. We never
+  // cache an isNative flag or fabricate an address — wallet calls go straight to
+  // the bridge, which decides native / mock / QR at call time.
   var userAddr = '';
   var currentUserId = 0;
   var currentDmConvId = null;
@@ -1772,6 +1775,8 @@
   // governed rate. 0.20 = the 20% default before any vote passes.
   var GALLERY_FEE_RATE = 0.20;
   var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
+  var NO_WALLET_MSG = "Open this in the Usernode app to vote.";
+  var VOTE_FAILED_MSG = "Your vote wasn't recorded on-chain — please try again.";
   // The collective's governance wallet. Every vote is sent here (amount 1, the
   // bridge's default nonzero fee) with a JSON memo the backend reads to tally
   // and record results on-chain. Must stay byte-for-byte.
@@ -1826,11 +1831,47 @@
   }
 
   // ── Bridge helpers ─────────────────────────────────────────────────────────
+  // All wallet access goes through the platform bridge (window.getNodeAddress /
+  // window.sendTransaction). The bridge — not this app — decides native / mock /
+  // QR at call time, so there is no cached isNative flag and no fabricated data.
+  function wait(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function isUt1Address(a) {
+    return typeof a === 'string' && /^ut1[0-9a-z]+/i.test(a);
+  }
+
+  function canSendTransaction() {
+    return typeof window.sendTransaction === 'function';
+  }
+
+  function callGetNodeAddress() {
+    if (typeof window.getNodeAddress !== 'function') {
+      return Promise.reject(new Error('bridge not ready'));
+    }
+    return withTimeout(Promise.resolve().then(function () { return window.getNodeAddress(); }), 2000);
+  }
+
+  // Resolve the wallet address from the bridge. getNodeAddress can run before the
+  // iframe discover-ack relay lands, so retry a couple of times with a brief wait
+  // before falling back to '' (= genuinely no wallet; callers show an honest
+  // "open in the Usernode app" state rather than fabricating an address).
   function bridgeGetAddress() {
-    NATIVE = !!(window.usernode && window.usernode.isNative);
-    if (NATIVE) return withTimeout(window.getNodeAddress(), 12000);
-    var suffix = TOKEN ? TOKEN.slice(-8) : 'demotest';
-    return Promise.resolve('ut1demo' + suffix);
+    var attempts = 0;
+    var MAX = 3;
+    function attempt() {
+      attempts++;
+      return callGetNodeAddress().then(function (addr) {
+        if (isUt1Address(addr)) return addr;
+        if (attempts < MAX) return wait(450).then(attempt);
+        return '';
+      }).catch(function () {
+        if (attempts < MAX) return wait(450).then(attempt);
+        return '';
+      });
+    }
+    return attempt();
   }
 
   // The Ledger tab reads the collective's live on-chain ledger APIs directly
@@ -1839,31 +1880,22 @@
 
   // Fetch the artist record for the connected wallet from the collective's
   // public website API. Surfaces both the sales feed (for the "Your sales"
-  // panel) and the portrait (for the dashboard avatar). In demo mode (no real
-  // wallet) returns obviously-fake staging sales and no portrait (so the avatar
-  // falls back to initials). Any error / non-OK status resolves to empty values.
+  // panel) and the portrait (for the dashboard avatar). With no wallet address
+  // there is nothing to fetch, so it resolves to empty values (no fabricated
+  // data). Any error / non-OK status also resolves to empty values.
   function fetchArtist(addr) {
-    if (NATIVE) {
-      return fetch('https://artists-collective.pages.dev/api/artist?addr=' + encodeURIComponent(addr))
-        .then(function (res) {
-          if (!res.ok) return { sales: [], portrait: '' };
-          return res.json().then(function (data) {
-            return {
-              sales: Array.isArray(data && data.sales) ? data.sales : [],
-              portrait: (data && data.portrait) || '',
-            };
-          });
-        })
-        .catch(function () { return { sales: [], portrait: '' }; });
-    }
-    return Promise.resolve({
-      sales: [
-        { title: 'Staging demo — Reach',            buyer: 'Galerie Onze',          price: 2600 },
-        { title: 'Staging demo — Autumn Light #1',  buyer: 'staging-demo-buyer-a',  price: 450 },
-        { title: 'Staging demo — Quiet Tide #3',    buyer: 'staging-demo-buyer-c',  price: 620 },
-      ],
-      portrait: '',
-    });
+    if (!addr) return Promise.resolve({ sales: [], portrait: '' });
+    return fetch('https://artists-collective.pages.dev/api/artist?addr=' + encodeURIComponent(addr))
+      .then(function (res) {
+        if (!res.ok) return { sales: [], portrait: '' };
+        return res.json().then(function (data) {
+          return {
+            sales: Array.isArray(data && data.sales) ? data.sales : [],
+            portrait: (data && data.portrait) || '',
+          };
+        });
+      })
+      .catch(function () { return { sales: [], portrait: '' }; });
   }
 
   // ── Avatar rendering ───────────────────────────────────────────────────────
@@ -1907,15 +1939,15 @@
     img.src = url;
   }
 
+  // Send a transaction through the platform bridge. No mock / fabricated hash —
+  // the returned promise resolves with the real tx only once the bridge confirms,
+  // and rejects on failure (callers decide how to surface that). A missing bridge
+  // rejects rather than pretending to succeed.
   function bridgeSend(dest, amount, memo) {
-    if (NATIVE) {
-      return window.sendTransaction(dest, amount, memo).catch(function (err) {
-        console.warn('sendTransaction error:', err);
-        return null;
-      });
+    if (!canSendTransaction()) {
+      return Promise.reject(new Error('No wallet bridge available'));
     }
-    console.log('[demo] sendTransaction', { dest: dest, amount: amount, memo: memo });
-    return Promise.resolve({ hash: 'demo-tx-' + Math.random().toString(36).slice(2, 10) });
+    return window.sendTransaction(dest, amount, memo);
   }
 
   function truncAddr(addr) {
@@ -1937,11 +1969,11 @@
 
   // ── Stats ──────────────────────────────────────────────────────────────────
   // Derived from the DB source of truth: sales (/api/sales) and enrolments
-  // (/api/enrolments). In NATIVE mode "Your sales" is filtered to the connected
-  // wallet; in demo mode (no real wallet) we show all sales so the dashboard
-  // isn't blank.
+  // (/api/enrolments). With a connected wallet, "Your sales" is filtered to that
+  // address; with no wallet at all we show the full list so the dashboard isn't
+  // blank.
   function mySales(sales, addr) {
-    return NATIVE ? sales.filter(function (s) { return s.seller_addr === addr; }) : sales;
+    return addr ? sales.filter(function (s) { return s.seller_addr === addr; }) : sales;
   }
 
   function computeStats(sales, enrolments, addr) {
@@ -2241,52 +2273,56 @@
   }
 
   // ── Vote handler ───────────────────────────────────────────────────────────
+  // A vote is a REAL on-chain transaction. It only counts once that transaction
+  // resolves with a real tx; until then we show "recording your vote on-chain…",
+  // and on reject we surface a friendly error leaving the proposal re-votable.
+  // No DB write, no fabricated hash, happens before the send confirms.
   function handleVote(e) {
     var btn = e.currentTarget;
     var proposalId = parseInt(btn.dataset.id, 10);
     var direction = btn.dataset.dir;
     var allBtns = btn.closest('.proposal').querySelectorAll('.vote-btn');
 
+    // Genuinely no wallet (plain desktop browser, no native bridge, no QR) →
+    // be honest instead of faking a vote.
+    if (!userAddr || !canSendTransaction()) {
+      showChainNotice(NO_WALLET_MSG);
+      return;
+    }
+
     allBtns.forEach(function (b) { b.disabled = true; });
 
-    // 1) DB write is the source of truth. 2) Refresh the tally + badges from the
-    // DB immediately so the new count and any just-decided outcome show at once.
-    // 3) Fire the real on-chain send to the governance address in the background,
-    //    behind a "recording your vote on-chain…" indicator that clears when the
-    //    transaction confirms (the send promise resolving) — no timer/countdown.
-    api('/api/votes', {
-      method: 'POST',
-      body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
-    }).then(function () {
-      return Promise.all([api('/api/proposals'), api('/api/platform')]);
-    }).then(function (results) {
-      renderProposals(results[0].proposals);
-      renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
+    // memo is the exact JSON string the backend tallies — byte-for-byte
+    // {"app":"acg","type":"vote","proposal":<id>,"choice":"yes"|"no","voter":"<addr>"}.
+    var choice = direction === 'for' ? 'yes' : 'no';
+    var memo = JSON.stringify({ app: 'acg', type: 'vote', proposal: proposalId, choice: choice, voter: userAddr });
+    showChainNotice('Recording your vote on-chain…', true);
 
-      // Best-effort on-chain receipt. memo is the exact JSON string the backend
-      // tallies — byte-for-byte {"app":"acg","type":"vote","proposal":<id>,
-      // "choice":"yes"|"no","voter":"<addr>"}. The send goes to GOV_ADDR, amount
-      // 1, with the bridge's default (nonzero) fee — never a literal 0.
-      var choice = direction === 'for' ? 'yes' : 'no';
-      var memo = JSON.stringify({ app: 'acg', type: 'vote', proposal: proposalId, choice: choice, voter: userAddr });
-      showChainNotice('Recording your vote on-chain…', true);
-      bridgeSend(GOV_ADDR, 1, memo).then(function (result) {
-        showChainNotice(''); // confirmed (or demo) — clear the indicator
-        if (NATIVE && !result) { showChainNotice(NO_BALANCE_MSG); return; }
-        var hash = result && (result.hash || result.id || result.txid);
+    // Send to the governance address, amount 1, bridge's default (nonzero) fee.
+    // Await the real tx; only on resolve do we record the confirmed vote.
+    window.sendTransaction(GOV_ADDR, 1, memo).then(function (result) {
+      var hash = result && (result.hash || result.id || result.txid);
+      return api('/api/votes', {
+        method: 'POST',
+        body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
+      }).then(function () {
         if (hash) {
-          api('/api/votes/' + proposalId + '/tx', {
+          return api('/api/votes/' + proposalId + '/tx', {
             method: 'POST',
             body: JSON.stringify({ tx_hash: hash }),
           }).catch(function () { /* receipt persistence is best-effort */ });
         }
-      }).catch(function (err) {
-        console.warn('vote send error:', err);
-        showChainNotice('');
+      }).then(function () {
+        return Promise.all([api('/api/proposals'), api('/api/platform')]);
+      }).then(function (results) {
+        showChainNotice(''); // confirmed — clear the indicator
+        renderProposals(results[0].proposals);
+        renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
       });
     }).catch(function (err) {
-      console.error('Vote error:', err);
-      allBtns.forEach(function (b) { b.disabled = false; });
+      console.warn('vote send failed:', err);
+      showChainNotice(VOTE_FAILED_MSG);
+      allBtns.forEach(function (b) { b.disabled = false; }); // leave it re-votable
     });
   }
 
@@ -2339,18 +2375,24 @@
       titleInput.value = '';
       amountInput.value = '';
 
-      // 2) Best-effort on-chain receipt. A null result means the node rejected
-      //    the send (e.g. no spendable balance) — the sale is still saved.
+      // 2) Best-effort on-chain receipt. The sale is already saved (DB is the
+      //    source of truth); with no wallet we simply skip the receipt, and a
+      //    rejected send (e.g. no spendable balance) is non-fatal.
+      if (!userAddr || !canSendTransaction()) {
+        return refreshDashboard();
+      }
       return bridgeSend(userAddr, 1, memo).then(function (result) {
-        if (result && result.hash && sale && sale.id != null) {
+        var hash = result && (result.hash || result.id || result.txid);
+        if (hash && sale && sale.id != null) {
           api('/api/sales/' + sale.id + '/tx', {
             method: 'POST',
-            body: JSON.stringify({ tx_hash: result.hash }),
+            body: JSON.stringify({ tx_hash: hash }),
           }).catch(function () {});
-          showChainNotice('');
-        } else if (!result) {
-          showChainNotice(NO_BALANCE_MSG);
         }
+        showChainNotice('');
+        return refreshDashboard();
+      }).catch(function () {
+        showChainNotice(NO_BALANCE_MSG);
         return refreshDashboard();
       });
     }).then(function () {
@@ -2856,7 +2898,7 @@
     api('/api/sales').then(function (data) {
       var sales = (data && data.sales) || [];
       var myAddr = userAddr;
-      var mySales = NATIVE ? sales.filter(function (s) { return s.seller_addr === myAddr; }) : sales;
+      var mySales = myAddr ? sales.filter(function (s) { return s.seller_addr === myAddr; }) : sales;
       var total = mySales.reduce(function (s, r) { return s + Number(r.amount || 0); }, 0);
       var el = document.getElementById('welcome-tact');
       if (el && total > 0) {
@@ -2897,25 +2939,24 @@
     btn.disabled = true;
     btn.textContent = 'Connecting…';
 
-    // Re-read isNative here (relay handshake has completed by now) so the
-    // mode notice reflects the actual runtime context before we connect.
-    var isLive = !!(window.usernode && window.usernode.isNative);
-    document.getElementById('mode-notice').textContent = isLive
-      ? 'Live mode — real on-chain transactions.'
-      : 'Demo mode — no real transactions.';
-
     bridgeGetAddress().then(function (addr) {
       userAddr = addr;
-      document.getElementById('addr-pill').textContent = truncAddr(userAddr);
-      document.getElementById('dash-subtitle').textContent = 'Connected as ' + truncAddr(userAddr);
+      // The mode notice reflects the actual runtime context, read at call time.
+      document.getElementById('mode-notice').textContent = userAddr
+        ? 'Connected — votes are real on-chain transactions.'
+        : 'Open in the Usernode app to make on-chain transactions.';
+      document.getElementById('addr-pill').textContent = userAddr ? truncAddr(userAddr) : 'No wallet';
+      document.getElementById('dash-subtitle').textContent = userAddr
+        ? 'Connected as ' + truncAddr(userAddr)
+        : 'Browsing — open in the Usernode app to vote';
       // Show the initials fallback immediately; the artist fetch in
       // loadDashboard swaps in the real portrait once it resolves.
       renderAvatar('');
 
-      if (NATIVE) {
-        // Enrol if NATIVE: the addr UNIQUE constraint dedupes server-side, so we
-        // just POST and let the DB decide if it's a new enrolment. A new enrolment
-        // gets a best-effort on-chain receipt and triggers the welcome panel.
+      if (userAddr) {
+        // With a wallet, enrol: the addr UNIQUE constraint dedupes server-side,
+        // so we just POST and let the DB decide if it's a new enrolment. A new
+        // enrolment gets a best-effort on-chain receipt and the welcome panel.
         api('/api/enrolments', {
           method: 'POST',
           body: JSON.stringify({ addr: userAddr }),
@@ -2925,16 +2966,17 @@
 
           if (isNew) {
             bridgeSend(userAddr, 1, 'artist:enrol:' + userAddr).then(function (result) {
-              if (result && result.hash) {
+              var hash = result && (result.hash || result.id || result.txid);
+              if (hash) {
                 api('/api/enrolments/' + resp.enrolment.id + '/tx', {
                   method: 'POST',
-                  body: JSON.stringify({ tx_hash: result.hash }),
+                  body: JSON.stringify({ tx_hash: hash }),
                 }).catch(function () {});
-              } else if (!result) {
-                showChainNotice(NO_BALANCE_MSG);
               }
               return refreshDashboard();
-            }).catch(function () {});
+            }).catch(function () {
+              showChainNotice(NO_BALANCE_MSG);
+            });
           }
 
           if (isNew || notSeenWelcome) {
@@ -2946,6 +2988,8 @@
           enterStudio();
         });
       } else {
+        // No wallet — enter the studio in browse mode; voting prompts to open
+        // the Usernode app rather than fabricating a transaction.
         enterStudio();
       }
     }).catch(function (err) {
@@ -2965,14 +3009,20 @@
     btn.disabled = true;
     btn.textContent = 'Registering on-chain…';
 
-    NATIVE = !!(window.usernode && window.usernode.isNative);
-
     Promise.all([
       bridgeGetAddress(),
       api('/api/me').catch(function () { return {}; }),
     ]).then(function (results) {
       var addr = results[0];
       var me = results[1] || {};
+      if (!addr) {
+        // Genuinely no wallet — be honest instead of fabricating an address.
+        btn.disabled = false;
+        btn.textContent = 'Create your artist account →';
+        errEl.textContent = 'Open this in the Usernode app to create your artist account.';
+        errEl.classList.remove('hidden');
+        return;
+      }
       var name = me.username || addr;
       var displayNameInput = document.getElementById('enrol-display-name');
       var displayName = (displayNameInput && displayNameInput.value.trim()) || name;
@@ -2985,8 +3035,10 @@
 
       // sendTransaction resolves only after on-chain confirmation; there is no
       // broadcast callback. Race it against a 10s timeout so the tab opens at
-      // approval/broadcast time rather than waiting for confirmation.
-      var txPromise = bridgeSend(addr, 1, 'ENROL:' + name);
+      // approval/broadcast time rather than waiting for confirmation. The send's
+      // own rejection is swallowed so a failed/declined tx still opens the join
+      // page (account creation continues on the website).
+      var txPromise = bridgeSend(addr, 1, 'ENROL:' + name).catch(function () { return null; });
       var timeoutPromise = new Promise(function (resolve) {
         setTimeout(resolve, 10000);
       });
@@ -3271,9 +3323,9 @@
   };
 
   // ── Init ───────────────────────────────────────────────────────────────────
-  // NATIVE is detected lazily in bridgeGetAddress() — reading isNative here
-  // would always return false because the bridge's iframe relay handshake
-  // hasn't completed yet. The mode notice is updated in the enter-btn handler.
+  // Wallet access is resolved on demand via the bridge (bridgeGetAddress, which
+  // retries while the iframe relay handshake settles). The mode notice is set in
+  // the enter-btn handler once the address resolves.
   applyTheme();
 
   // Auto-enter enrolled users: if a token is present, check whether the
@@ -3349,7 +3401,7 @@
   }
 
   // ?demo=welcome shows the one-time welcome panel with a hardcoded TACT value
-  // so the panel can be tested in staging without a real NATIVE wallet session.
+  // so the panel can be tested in staging without a connected wallet session.
   if (params.get('demo') === 'welcome') {
     setTimeout(function () {
       document.getElementById('site-header').classList.remove('hidden');
