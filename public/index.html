@@ -445,32 +445,15 @@
     }
     .avatar.has-img .avatar-img { display: block; }
     .avatar.has-img .avatar-initials { display: none; }
-    .avatar.loading::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(0,0,0,0.45);
-      border-radius: 50%;
-    }
     .dash-id-text { min-width: 0; }
     .avatar-actions { margin-top: 0.5rem; }
-    #avatar-change-btn {
-      font: inherit;
-      font-size: 0.82rem;
-      color: var(--accent);
-      background: transparent;
-      border: 1px solid var(--accent);
-      border-radius: 999px;
-      padding: 0.3rem 0.8rem;
-      cursor: pointer;
-    }
-    #avatar-change-btn:hover:not(:disabled) { opacity: 0.82; }
-    #avatar-change-btn:disabled { opacity: 0.45; cursor: default; }
-    #avatar-error {
-      color: var(--accent);
+    .avatar-hint {
       font-size: 0.8rem;
-      margin-top: 0.4rem;
+      color: var(--ink-2);
+      line-height: 1.45;
+      max-width: 22rem;
     }
+    .avatar-hint strong { color: var(--ink); font-weight: 600; }
 
     /* ── Stats grid ── */
     .stats-grid {
@@ -618,6 +601,13 @@
 
     .vote-counts .for-count  { color: var(--ok); }
     .vote-counts .against-count { color: var(--accent); }
+
+    .vote-confirming {
+      font-size: 0.77rem;
+      color: var(--ink-2);
+      font-style: italic;
+      margin-bottom: 0.9rem;
+    }
 
     .vote-buttons { display: flex; gap: 0.5rem; }
 
@@ -1512,10 +1502,8 @@
         <h1>Studio dashboard</h1>
         <p class="subtitle" id="dash-subtitle">Your on-chain presence in The Artists' Collective.</p>
         <div class="avatar-actions">
-          <button id="avatar-change-btn" type="button">Change profile picture</button>
-          <input id="avatar-file" type="file" accept="image/jpeg,image/png,image/webp,image/gif" class="hidden" />
+          <p class="avatar-hint">To change your picture, open <strong>Desktop access</strong> and sign in to your studio from a computer.</p>
         </div>
-        <p id="avatar-error" class="hidden"></p>
       </div>
     </div>
   </div>
@@ -1769,10 +1757,27 @@
   var currentDmConvId = null;
   var dbSales = [];
   var dbEnrolments = [];
+  // ── Governance display state (on-chain canonical) ───────────────────────────
+  // Proposal Yes/No counts, badges and the Fee Split display are driven by the
+  // collective's on-chain governance feed (LEDGER_GOV_URL), never by the local
+  // DB tallies. These hold the latest fetched on-chain data + the last-rendered
+  // DB proposal list / platform record so the post-vote confirm poll can
+  // re-render without re-plumbing every caller.
+  var govProposals = {};   // id-string → { id, title, yes, no, total, status }
+  var govVotes = [];       // [{ proposal_id, title, voter, choice, ... }]
+  var lastDbProposals = []; // last proposal list from /api/proposals (text/my_vote)
+  var lastPlatform = null;  // last /api/platform record (fee numbers)
+  // A just-cast vote takes a moment to be tallied on-chain. While it confirms we
+  // show "your vote: Yes/No (confirming…)" on its card without fabricating any
+  // count, and poll the chain until the vote appears. { proposalId, choice }.
+  var pendingVote = null;
+  var _votePollTimer = null;
+  var FEE_PROPOSAL_ID = 1;     // the Fee Split proposal governs the platform fee
+  var DEFAULT_FEE_PERCENT = 20; // pre-vote fee shown while #1 is open / not passed
   // The platform fee is governed by the Fee Split proposal (see renderFeeStatus).
-  // Initialised to the default fee and overwritten with the live value from
-  // /api/platform once the dashboard loads, so newly recorded sales use the
-  // governed rate. 0.20 = the 20% default before any vote passes.
+  // Initialised to the default fee and overwritten with the live value once the
+  // dashboard loads, so newly recorded sales use the governed rate. 0.20 = the
+  // 20% default before any vote passes.
   var GALLERY_FEE_RATE = 0.20;
   var NO_BALANCE_MSG = "Saved. The on-chain receipt couldn't be posted right now because your wallet has no spendable balance yet.";
   var NO_WALLET_MSG = "Open this in the Usernode app to vote.";
@@ -1996,27 +2001,63 @@
     document.getElementById('stat-sales-value').textContent = '$' + stats.salesValue.toLocaleString();
   }
 
-  // ── Render: platform fee status ───────────────────────────────────────────
-  // Updates the always-present Fee Split badge + displayed fee from /api/platform.
-  // The badge element is static in the HTML (default "Voting open") so the
-  // .proposal-outcome selector exists even if this never runs / the fetch fails.
-  // Also syncs GALLERY_FEE_RATE so recorded sales use the governed fee.
-  function renderFeeStatus(platform) {
-    if (!platform) return;
-    var feePercent = Number(platform.feePercent);
-    if (!isNaN(feePercent)) {
-      GALLERY_FEE_RATE = feePercent / 100;
-      var valueEl = document.getElementById('platform-fee-value');
-      if (valueEl) valueEl.textContent = feePercent + '%';
+  // ── Governance: on-chain feed helpers ──────────────────────────────────────
+  // The collective's on-chain governance feed is the canonical source for every
+  // proposal's Yes/No tally and decided status. We never count from the local DB
+  // (which still holds stale test votes). LEDGER_GOV_URL is defined in the Ledger
+  // section below; these helpers are hoisted and only read it at call time.
+  function fetchGov() {
+    return fetch(LEDGER_GOV_URL)
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .catch(function () { return {}; });
+  }
+  function applyGov(gov) {
+    govProposals = (gov && gov.proposals) || {};
+    govVotes = (gov && gov.votes) || [];
+  }
+  // Normalise an on-chain choice ('yes'/'for' → 'for', 'no'/'against' → 'against').
+  function normChoice(c) {
+    return (c === 'yes' || c === 'for') ? 'for' : (c === 'no' || c === 'against') ? 'against' : null;
+  }
+  // Has the connected wallet's vote on this proposal landed in the on-chain feed?
+  // Returns 'for' / 'against' / null. Used both for the active-button highlight
+  // and to detect when a just-cast vote has confirmed.
+  function myOnchainChoice(pid) {
+    if (!userAddr) return null;
+    for (var i = 0; i < govVotes.length; i++) {
+      var v = govVotes[i];
+      var vp = v.proposal_id != null ? v.proposal_id : v.proposal;
+      if (String(vp) === String(pid) && (v.voter || v.voter_address) === userAddr) {
+        return normChoice(v.choice || v.direction);
+      }
     }
+    return null;
+  }
+
+  // ── Render: platform fee status ───────────────────────────────────────────
+  // The Fee Split badge + displayed fee are driven by the ON-CHAIN status of
+  // proposal #1 (govProposals["1"]), not the DB-derived /api/platform.status.
+  // /api/platform is still consulted only for the numeric proposed fee (15);
+  // the pre-vote fee is the documented 20% default. GALLERY_FEE_RATE is synced
+  // to the displayed fee so newly recorded sales use the governed rate.
+  function renderFeeStatus(platform) {
+    lastPlatform = platform || lastPlatform;
+    var proposedFee = platform ? Number(platform.proposedFee) : NaN;
+    if (isNaN(proposedFee)) proposedFee = 15;
+    var oc = govProposals[String(FEE_PROPOSAL_ID)];
+    var status = (oc && oc.status) || 'open';
+    var displayFee = status === 'passed' ? proposedFee : DEFAULT_FEE_PERCENT;
+    GALLERY_FEE_RATE = displayFee / 100;
+    var valueEl = document.getElementById('platform-fee-value');
+    if (valueEl) valueEl.textContent = displayFee + '%';
     var badge = document.getElementById('proposal-outcome');
     if (!badge) return;
     badge.classList.remove('is-passed', 'is-failed');
-    if (platform.status === 'passed') {
-      badge.textContent = 'Passed — fee updated to ' + feePercent + '%';
+    if (status === 'passed') {
+      badge.textContent = 'Passed — fee updated to ' + proposedFee + '%';
       badge.classList.add('is-passed');
-    } else if (platform.status === 'failed') {
-      badge.textContent = 'Not passed — fee stays ' + feePercent + '%';
+    } else if (status === 'failed') {
+      badge.textContent = 'Not passed — fee stays ' + DEFAULT_FEE_PERCENT + '%';
       badge.classList.add('is-failed');
     } else {
       badge.textContent = 'Voting open';
@@ -2024,25 +2065,46 @@
   }
 
   // ── Render: proposals ─────────────────────────────────────────────────────
+  // The card list (id / title / description / vote buttons) comes from the DB
+  // (/api/proposals); the Yes/No counts, vote bar and badge come from the
+  // on-chain feed (govProposals), defaulting to 0/0/"Voting open" when a
+  // proposal has no on-chain activity yet — never fabricating counts.
   function renderProposals(proposals) {
+    proposals = proposals || [];
+    lastDbProposals = proposals;
     var el = document.getElementById('proposals-list');
     if (!proposals.length) {
       el.innerHTML = '<p class="proposal-desc">No proposals yet.</p>';
       return;
     }
     el.innerHTML = proposals.map(function (p) {
-      var forCount = p.for_count || 0;
-      var againstCount = p.against_count || 0;
+      var oc = govProposals[String(p.id)];
+      var forCount = oc ? (Number(oc.yes) || 0) : 0;
+      var againstCount = oc ? (Number(oc.no) || 0) : 0;
       var total = forCount + againstCount;
       var forPct = total > 0 ? Math.round(forCount / total * 100) : 50;
       var againstPct = 100 - forPct;
-      // Per-proposal sticky outcome badge — same rule + styles as the Fee Split
-      // badge: open → "Voting open"; passed → "Passed"; failed → "Not passed".
-      var status = p.status || 'open';
+      // Per-proposal sticky outcome badge from on-chain status:
+      // open → "Voting open"; passed → "Passed"; failed → "Not passed".
+      var status = (oc && oc.status) || 'open';
       var decided = status === 'passed' || status === 'failed';
       var badgeClass = status === 'passed' ? ' is-passed' : status === 'failed' ? ' is-failed' : '';
       var badgeText = status === 'passed' ? 'Passed' : status === 'failed' ? 'Not passed' : 'Voting open';
-      var dis = decided ? ' disabled' : '';
+
+      // A just-cast vote that hasn't yet appeared on-chain shows a confirming
+      // note and keeps its buttons held — without touching the counts above.
+      var pend = (pendingVote && String(pendingVote.proposalId) === String(p.id)) ? pendingVote : null;
+      var dis = (decided || pend) ? ' disabled' : '';
+
+      // Active highlight: pending choice if confirming, else the on-chain vote,
+      // else the DB record as a fallback.
+      var mine = pend ? (pend.choice === 'yes' ? 'for' : 'against')
+        : (myOnchainChoice(p.id) || (p.my_vote === 'for' ? 'for' : p.my_vote === 'against' ? 'against' : null));
+
+      var confirmHtml = pend
+        ? '<div class="vote-confirming">your vote: ' + (pend.choice === 'yes' ? 'Yes' : 'No') + ' (confirming…)</div>'
+        : '';
+
       return '<div class="proposal">' +
         '<div class="proposal-head">' +
           '<div class="proposal-title">' + esc(p.title) + '</div>' +
@@ -2057,10 +2119,11 @@
           '<span class="for-count">' + forCount + ' Yes</span>' +
           '<span class="against-count">' + againstCount + ' No</span>' +
         '</div>' +
+        confirmHtml +
         '<div class="vote-buttons">' +
-          '<button class="vote-btn for-btn' + (p.my_vote === 'for' ? ' active' : '') +
+          '<button class="vote-btn for-btn' + (mine === 'for' ? ' active' : '') +
             '" data-id="' + p.id + '" data-dir="for"' + dis + '>Yes</button>' +
-          '<button class="vote-btn against-btn' + (p.my_vote === 'against' ? ' active' : '') +
+          '<button class="vote-btn against-btn' + (mine === 'against' ? ' active' : '') +
             '" data-id="' + p.id + '" data-dir="against"' + dis + '>No</button>' +
         '</div>' +
       '</div>';
@@ -2261,9 +2324,12 @@
       var choiceClass = isYes ? 'pill-join' : 'pill-sale';
       var choiceLabel = isYes ? 'Yes' : 'No';
       var pid = v.proposal != null ? v.proposal : v.proposal_id;
+      // Prefer the human proposal title now carried by the feed; fall back to
+      // "Proposal #<id>" only when no title is present.
+      var voteLabel = v.title || ('Proposal #' + (pid != null ? pid : '?'));
       html += '<tr>' +
         '<td><span class="pill pill-sale">Vote</span></td>' +
-        '<td class="ledger-desc">Proposal #' + esc(String(pid != null ? pid : '?')) + ' · <span class="mono">' + esc(truncAddr(v.voter || v.voter_address)) + '</span></td>' +
+        '<td class="ledger-desc"><em>' + esc(voteLabel) + '</em> · <span class="mono">' + esc(truncAddr(v.voter || v.voter_address)) + '</span></td>' +
         '<td><span class="pill ' + choiceClass + '">' + choiceLabel + '</span></td>' +
         '<td>' + canonicalBadge() + '</td>' +
         '<td>' + explorerTxLink(explorerUi, v.tx_id || v.tx_hash) + '</td>' +
@@ -2302,10 +2368,12 @@
     // Await the real tx; only on resolve do we record the confirmed vote.
     window.sendTransaction(GOV_ADDR, 1, memo).then(function (result) {
       var hash = result && (result.hash || result.id || result.txid);
+      // Best-effort DB writes so DB-derived views / my_vote don't drift further.
+      // The on-chain feed remains canonical for the displayed counts.
       return api('/api/votes', {
         method: 'POST',
         body: JSON.stringify({ proposal_id: proposalId, direction: direction }),
-      }).then(function () {
+      }).catch(function () { /* advisory only */ }).then(function () {
         if (hash) {
           return api('/api/votes/' + proposalId + '/tx', {
             method: 'POST',
@@ -2313,17 +2381,65 @@
           }).catch(function () { /* receipt persistence is best-effort */ });
         }
       }).then(function () {
-        return Promise.all([api('/api/proposals'), api('/api/platform')]);
+        // The send confirmed: clear the persistent "Recording…" notice and move
+        // the just-cast choice into a per-card "confirming…" state. The new vote
+        // takes a moment to be tallied on-chain, so we re-fetch the chain (counts
+        // unchanged until it lands) and poll until it appears — never bumping the
+        // count optimistically.
+        showChainNotice('');
+        pendingVote = { proposalId: proposalId, choice: choice };
+        return Promise.all([fetchGov(), api('/api/proposals'), api('/api/platform')]);
       }).then(function (results) {
-        showChainNotice(''); // confirmed — clear the indicator
-        renderProposals(results[0].proposals);
-        renderFeeStatus(results[1]); // reflect any fee-outcome change this vote caused
+        applyGov(results[0]);
+        renderFeeStatus(results[2]);
+        renderProposals(results[1].proposals);
+        startVoteConfirmPoll(proposalId, direction);
       });
     }).catch(function (err) {
       console.warn('vote send failed:', err);
       showChainNotice(VOTE_FAILED_MSG);
       allBtns.forEach(function (b) { b.disabled = false; }); // leave it re-votable
     });
+  }
+
+  // Poll the on-chain governance feed until a just-cast vote appears, then clear
+  // the confirming state and re-render from the chain. Bounded so a slow/never-
+  // landing vote degrades gracefully: the "confirming…" note simply stays until
+  // the next dashboard load (the tx already went on-chain). expected is the
+  // normalised direction ('for'/'against') we're waiting to see.
+  function clearVotePoll() {
+    if (_votePollTimer) { clearTimeout(_votePollTimer); _votePollTimer = null; }
+  }
+  function startVoteConfirmPoll(proposalId, expectedDir) {
+    clearVotePoll();
+    var attempts = 0;
+    var MAX = 6;
+    function tick() {
+      attempts++;
+      fetchGov().then(function (gov) {
+        applyGov(gov);
+        var landed = myOnchainChoice(proposalId) === normChoice(expectedDir);
+        if (landed) {
+          if (pendingVote && String(pendingVote.proposalId) === String(proposalId)) pendingVote = null;
+          clearVotePoll();
+          renderFeeStatus(lastPlatform);
+          renderProposals(lastDbProposals);
+          return;
+        }
+        // Still confirming — re-render so any other on-chain movement shows.
+        renderFeeStatus(lastPlatform);
+        renderProposals(lastDbProposals);
+        if (attempts < MAX) {
+          _votePollTimer = setTimeout(tick, 4000);
+        } else {
+          clearVotePoll(); // give up quietly; leave the confirming note in place
+        }
+      }).catch(function () {
+        if (attempts < MAX) { _votePollTimer = setTimeout(tick, 4000); }
+        else { clearVotePoll(); }
+      });
+    }
+    _votePollTimer = setTimeout(tick, 4000);
   }
 
   // ── Refresh dashboard panels from the DB source of truth ─────────────────────
@@ -2869,6 +2985,7 @@
       fetchArtist(userAddr),
       api('/api/me'),
       api('/api/platform'),
+      fetchGov(), // on-chain governance feed → canonical counts/badges
     ]).then(function (results) {
       var proposals = results[0].proposals;
       dbSales = (results[1] && results[1].sales) || [];
@@ -2877,6 +2994,7 @@
       var me = results[4] || {};
       currentUserId = me.id || 0;
 
+      applyGov(results[6]); // populate govProposals / govVotes before rendering
       renderFeeStatus(results[5]);
       renderProposals(proposals);
       renderStats(computeStats(dbSales, dbEnrolments, userAddr));
@@ -3178,91 +3296,11 @@
     });
   }
 
-  // ── Change profile picture ─────────────────────────────────────────────────
-  // Reads the chosen image as base64 client-side, POSTs it to the dApp's own
-  // /api/avatar route (which forwards server-side to the gallery with the bearer
-  // key — never exposed here), then swaps the avatar to the returned portrait.
-  // No wallet/on-chain involvement. Any failure shows a friendly inline error.
-  var MAX_AVATAR_BYTES = 5 * 1024 * 1024; // 5MB
-  var avatarChangeBtn = document.getElementById('avatar-change-btn');
-  var avatarFileInput = document.getElementById('avatar-file');
-
-  function showAvatarError(msg) {
-    var errEl = document.getElementById('avatar-error');
-    if (!errEl) return;
-    errEl.textContent = msg;
-    errEl.classList.remove('hidden');
-  }
-  function clearAvatarError() {
-    var errEl = document.getElementById('avatar-error');
-    if (!errEl) return;
-    errEl.textContent = '';
-    errEl.classList.add('hidden');
-  }
-
-  if (avatarChangeBtn && avatarFileInput) {
-    avatarChangeBtn.addEventListener('click', function () {
-      clearAvatarError();
-      avatarFileInput.click();
-    });
-
-    avatarFileInput.addEventListener('change', function () {
-      var file = avatarFileInput.files && avatarFileInput.files[0];
-      if (!file) return;
-      clearAvatarError();
-
-      if (file.size > MAX_AVATAR_BYTES) {
-        showAvatarError("That image is too large (5MB max). Try a smaller one.");
-        avatarFileInput.value = '';
-        return;
-      }
-
-      var avatarEl = document.getElementById('avatar');
-      avatarChangeBtn.disabled = true;
-      avatarChangeBtn.textContent = 'Updating…';
-      if (avatarEl) avatarEl.classList.add('loading');
-
-      function restore() {
-        avatarChangeBtn.disabled = false;
-        avatarChangeBtn.textContent = 'Change profile picture';
-        if (avatarEl) avatarEl.classList.remove('loading');
-        avatarFileInput.value = '';
-      }
-
-      var reader = new FileReader();
-      reader.onerror = function () {
-        restore();
-        showAvatarError("Couldn't update your picture, try again");
-      };
-      reader.onload = function () {
-        var result = String(reader.result || '');
-        var comma = result.indexOf(',');
-        var image_base64 = comma >= 0 ? result.slice(comma + 1) : '';
-        if (!image_base64) {
-          restore();
-          showAvatarError("Couldn't update your picture, try again");
-          return;
-        }
-        api('/api/avatar', {
-          method: 'POST',
-          body: JSON.stringify({
-            address: userAddr,
-            content_type: file.type,
-            image_base64: image_base64,
-          }),
-        }).then(function (data) {
-          if (!data || !data.portrait_url) throw new Error('missing portrait_url');
-          renderAvatar(data.portrait_url);
-          restore();
-        }).catch(function (err) {
-          console.warn('Avatar update error:', err);
-          restore();
-          showAvatarError("Couldn't update your picture, try again");
-        });
-      };
-      reader.readAsDataURL(file);
-    });
-  }
+  // ── Profile picture ─────────────────────────────────────────────────────────
+  // The avatar shows the portrait the gallery website provides for the connected
+  // wallet (see renderAvatar / fetchArtist). The in-app upload was removed: the
+  // app webview blocks file inputs, so the picker never opened. To change the
+  // picture, artists sign in to the desktop studio via the Desktop access tab.
 
   // ── Mobile bottom nav ─────────────────────────────────────────────────────
   var NAV_PAGES = ['view-dash', 'view-ledger', 'view-forum', 'view-messages', 'view-web'];

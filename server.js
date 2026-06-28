@@ -938,6 +938,36 @@ async function start() {
     ON CONFLICT (id) DO NOTHING
   `, [FEE_PROPOSAL_ID]);
 
+  // ── Staging-only proposal presence guarantee ────────────────────────────────
+  // The dashboard's Governance cards are DB-backed for their title/description
+  // (counts + badges come from the live on-chain ledger-governance feed). The
+  // product seed above already inserts proposals 1/3/4/5/6 in every environment,
+  // so this block is normally a no-op (ON CONFLICT DO NOTHING). It exists so the
+  // title display + "confirming…" flow stay exercisable in a freshly-emptied
+  // staging DB even if the product seed is ever trimmed — using obviously-fake
+  // "Staging demo …" titles that only surface when no real row claims the id.
+  if (IS_STAGING) {
+    const stagingDemoProposals = [
+      [FEE_PROPOSAL_ID, 'Staging demo — Fee Split: lower the platform fee from 20% to 15%',
+        'Staging demo proposal. Cut the gallery fee on every sale from 20% to 15%.'],
+      [3, 'Staging demo — Allocate 40% of the treasury to marketing & reach',
+        'Staging demo proposal. Commit 40% of the treasury to advertising and growth.'],
+      [4, 'Staging demo — Introduce a 2% artist dividend from each sale',
+        'Staging demo proposal. Pay every enrolled artist a 2% dividend from each sale.'],
+      [5, 'Staging demo — Feature one rising artist on the homepage each week',
+        'Staging demo proposal. Spotlight a different emerging member weekly.'],
+      [6, 'Staging demo — Open the collective to outside collectors as non-voting members',
+        'Staging demo proposal. Let outside collectors join without a governance vote.'],
+    ];
+    for (const [id, title, description] of stagingDemoProposals) {
+      await pool.query(`
+        INSERT INTO governance_proposals (id, title, description)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, title, description]);
+    }
+  }
+
   // Boot-time back-fill (all environments): decide any proposal that already
   // sits at/above quorum so its badge renders without waiting for a new vote.
   // Sticky, so this is idempotent across reboots.
