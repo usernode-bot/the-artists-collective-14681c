@@ -52,9 +52,9 @@
       "expectSelector": "#avatar"
     },
     {
-      "name": "Change profile picture button renders",
+      "name": "Profile avatar desktop-access hint renders",
       "path": "/?demo=1",
-      "expectSelector": "#avatar-change-btn"
+      "expectSelector": ".avatar-hint"
     },
     {
       "name": "Messages tab renders",
@@ -82,9 +82,9 @@
       "expectSelector": ".proposal .proposal-outcome"
     },
     {
-      "name": "Decided proposal shows Not passed badge",
+      "name": "Proposal card shows human title",
       "path": "/?demo=1",
-      "expectText": "Not passed"
+      "expectText": "Feature one rising artist on the homepage each week"
     },
     {
       "name": "Undecided proposal shows Voting open badge",
