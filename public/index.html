@@ -638,6 +638,24 @@
       color: var(--paper);
     }
 
+    /* ── Proposal outcome badge ── */
+    .proposal-outcome {
+      font-size: 0.82rem;
+      font-weight: 500;
+      padding: 0.3rem 0;
+      margin-bottom: 0.55rem;
+    }
+    .outcome-passed { color: var(--ok); }
+    .outcome-not-passed { color: var(--ink-2); }
+
+    /* ── Fee status line ── */
+    #fee-status {
+      margin-bottom: 0.9rem;
+      font-size: 0.84rem;
+      color: var(--ink-2);
+    }
+    #stat-fee { color: var(--ink); }
+
     /* ── Sales panel ── */
     .sales-list { margin-bottom: 0; }
 
@@ -1855,6 +1873,8 @@
   var currentDmConvId = null;
   var dbSales = [];
   var dbEnrolments = [];
+  var currentFeePct = 10;
+  var _proposalPoll = null;
   // ── Governance display state (on-chain canonical) ───────────────────────────
   // Proposal Yes/No counts, badges and the Fee Split display are driven by the
   // collective's on-chain governance feed (LEDGER_GOV_URL), never by the local
@@ -2171,6 +2191,7 @@
     proposals = proposals || [];
     lastDbProposals = proposals;
     var el = document.getElementById('proposals-list');
+    var pct = feePct != null ? feePct : currentFeePct;
     if (!proposals.length) {
       el.innerHTML = '<p class="proposal-desc">No proposals yet.</p>';
       return;
@@ -2500,6 +2521,17 @@
     });
   }
 
+  // ── Proposal poller ────────────────────────────────────────────────────────
+  function pollProposals() {
+    Promise.all([api('/api/proposals'), api('/api/platform')]).then(function (results) {
+      var proposals = (results[0] && results[0].proposals) || [];
+      var platform = results[1] || {};
+      if (platform.feePercent != null) currentFeePct = Number(platform.feePercent);
+      renderFeeStatus(results[1]);
+      renderProposals(proposals);
+    }).catch(function () {});
+  }
+
   // Poll the on-chain governance feed until a just-cast vote appears, then clear
   // the confirming state and re-render from the chain. Bounded so a slow/never-
   // landing vote degrades gracefully: the "confirming…" note simply stays until
@@ -2577,7 +2609,7 @@
     submitBtn.disabled = true;
     submitBtn.textContent = 'Recording…';
 
-    var fee = Math.round(amount * GALLERY_FEE_RATE);
+    var fee = Math.round(amount * (currentFeePct / 100));
     var memo = 'sale:' + title + ':' + amount + ':' + fee;
 
     // 1) Persist the sale in the DB (source of truth) — this always "sticks".
@@ -3186,7 +3218,9 @@
       dbEnrolments = (results[2] && results[2].enrolments) || [];
       var artist = results[3] || { sales: [], portrait: '' };
       var me = results[4] || {};
+      var platform = results[5] || {};
       currentUserId = me.id || 0;
+      currentFeePct = platform.feePercent != null ? Number(platform.feePercent) : 10;
 
       applyGov(results[6]); // populate govProposals / govVotes before rendering
       renderFeeStatus(results[5]);
@@ -3197,6 +3231,10 @@
       renderTreasury(dbSales);
       renderOwnership(dbEnrolments);
       loadDmUnreadCount();
+
+      // Start live tally polling while dashboard is visible.
+      clearInterval(_proposalPoll);
+      _proposalPoll = setInterval(pollProposals, 15000);
     }).catch(function (err) {
       console.error('Dashboard load error:', err);
     });
@@ -3548,12 +3586,17 @@
     if (viewId === 'view-messages') { showDmList(); loadDmConversations(); }
   });
 
-  // Keep the mobile nav in sync when header tabs are clicked
+  // Keep the mobile nav in sync when header tabs are clicked; manage polling.
   var _origShowView = showView;
   showView = function (viewId) {
     _origShowView(viewId);
     var idx = NAV_PAGES.indexOf(viewId);
     if (idx !== -1) updateMobNav(idx);
+    // Stop polling when leaving the dashboard; start (or keep) it when entering.
+    clearInterval(_proposalPoll);
+    if (viewId === 'view-dash') {
+      _proposalPoll = setInterval(pollProposals, 15000);
+    }
   };
 
   // ── Init ───────────────────────────────────────────────────────────────────

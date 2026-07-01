@@ -77,6 +77,21 @@
       "expectSelector": "#view-messages"
     },
     {
+      "name": "Fee stat renders",
+      "path": "/?demo=1",
+      "expectSelector": "#platform-fee-value"
+    },
+    {
+      "name": "Mobile header title renders",
+      "path": "/?demo=1",
+      "expectSelector": "#mob-header-title"
+    },
+    {
+      "name": "Profile view renders",
+      "path": "/?demo=1",
+      "expectSelector": "#view-profile"
+    },
+    {
       "name": "Welcome panel renders",
       "path": "/?demo=welcome",
       "expectSelector": "#view-welcome"
