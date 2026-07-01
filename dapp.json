@@ -42,6 +42,16 @@
       "expectSelector": "#tab-forum"
     },
     {
+      "name": "Challenge tab renders",
+      "path": "/?demo=1",
+      "expectSelector": "#tab-challenge"
+    },
+    {
+      "name": "Challenge view renders",
+      "path": "/?demo=1",
+      "expectSelector": "#view-challenge"
+    },
+    {
       "name": "Desktop access button renders",
       "path": "/?demo=1",
       "expectSelector": "#web-access-btn"

@@ -724,6 +724,141 @@ app.get('/api/dm/unread-count', async (req, res) => {
   }
 });
 
+// ── Weekly Art Challenge (public gallery; pure DB-backed, no on-chain
+//    component — mirrors the Forum feature's shape). ──────────────────────────
+// The active theme rotates automatically once a week, deterministically from
+// the calendar date, so it behaves identically in staging and production (no
+// admin role exists anywhere in this app yet — see challenge_prompts comment
+// in start()).
+function currentWeekInfo() {
+  var now = new Date();
+  var utcDate = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  // ISO week number: shift to the Thursday of this week, then count weeks
+  // from that ISO year's January 1st.
+  var isoDate = new Date(utcDate);
+  var isoDayNum = isoDate.getUTCDay() || 7; // Monday=1 .. Sunday=7
+  isoDate.setUTCDate(isoDate.getUTCDate() + 4 - isoDayNum);
+  var isoYear = isoDate.getUTCFullYear();
+  var yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  var weekNo = Math.ceil((((isoDate - yearStart) / 86400000) + 1) / 7);
+  var yearWeek = isoYear + '-W' + String(weekNo).padStart(2, '0');
+
+  // Monday..Sunday of the calendar week containing `now` (for display only).
+  var dayNum = utcDate.getUTCDay() || 7;
+  var monday = new Date(utcDate);
+  monday.setUTCDate(utcDate.getUTCDate() - dayNum + 1);
+  var sunday = new Date(monday);
+  sunday.setUTCDate(monday.getUTCDate() + 6);
+
+  return {
+    yearWeek: yearWeek,
+    weekIndex: isoYear * 53 + weekNo, // monotonic-enough key for prompt rotation
+    weekStart: monday.toISOString().slice(0, 10),
+    weekEnd: sunday.toISOString().slice(0, 10),
+  };
+}
+
+// Get-or-create this week's challenge row. Pure function of the current date
+// plus the seeded prompt pool, so it's identical in staging and production.
+async function getOrCreateCurrentChallenge() {
+  const info = currentWeekInfo();
+  const existing = await pool.query(
+    `SELECT id, year_week, theme, week_start, week_end, created_at FROM weekly_challenges WHERE year_week = $1`,
+    [info.yearWeek]
+  );
+  if (existing.rows.length) return existing.rows[0];
+
+  const countRes = await pool.query(`SELECT COUNT(*)::int AS n FROM challenge_prompts`);
+  const n = countRes.rows[0].n || 1;
+  const promptIdx = ((info.weekIndex % n) + n) % n;
+  const promptRes = await pool.query(
+    `SELECT id, theme FROM challenge_prompts ORDER BY sort_order ASC LIMIT 1 OFFSET $1`,
+    [promptIdx]
+  );
+  const prompt = promptRes.rows[0] || null;
+
+  await pool.query(`
+    INSERT INTO weekly_challenges (year_week, prompt_id, theme, week_start, week_end)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (year_week) DO NOTHING
+  `, [info.yearWeek, prompt ? prompt.id : null, prompt ? prompt.theme : 'Open theme', info.weekStart, info.weekEnd]);
+
+  const rows = await pool.query(
+    `SELECT id, year_week, theme, week_start, week_end, created_at FROM weekly_challenges WHERE year_week = $1`,
+    [info.yearWeek]
+  );
+  return rows.rows[0];
+}
+
+app.get('/api/challenges/current', async (req, res) => {
+  try {
+    const challenge = await getOrCreateCurrentChallenge();
+    const subsRes = await pool.query(`
+      SELECT
+        s.id, s.challenge_id, s.user_id, s.username, s.image_url, s.caption, s.created_at,
+        COUNT(l.id)::int AS like_count,
+        BOOL_OR(l.user_id = $2) AS liked_by_me
+      FROM challenge_submissions s
+      LEFT JOIN challenge_likes l ON l.submission_id = s.id
+      WHERE s.challenge_id = $1
+      GROUP BY s.id
+      ORDER BY s.created_at DESC
+    `, [challenge.id, req.user.id]);
+    const mySubmission = subsRes.rows.find((r) => r.user_id === req.user.id) || null;
+    res.json({ challenge, submissions: subsRes.rows, my_submission: mySubmission });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/challenges/current/submissions', async (req, res) => {
+  const imageUrl = String((req.body && req.body.image_url) || '').trim();
+  const caption = String((req.body && req.body.caption) || '').trim();
+  if (!/^https?:\/\//i.test(imageUrl)) {
+    return res.status(400).json({ error: 'Please provide an image URL starting with http:// or https://' });
+  }
+  try {
+    const challenge = await getOrCreateCurrentChallenge();
+    const { rows } = await pool.query(`
+      INSERT INTO challenge_submissions (challenge_id, user_id, username, image_url, caption)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (challenge_id, user_id) DO NOTHING
+      RETURNING id, challenge_id, user_id, username, image_url, caption, created_at
+    `, [challenge.id, req.user.id, req.user.username, imageUrl.slice(0, 2048), caption.slice(0, 280) || null]);
+    if (!rows.length) {
+      return res.status(409).json({ error: "You've already submitted this week" });
+    }
+    res.json({ submission: rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/submissions/:id/likes', async (req, res) => {
+  try {
+    await pool.query(`
+      INSERT INTO challenge_likes (submission_id, user_id, username)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (submission_id, user_id) DO NOTHING
+    `, [req.params.id, req.user.id, req.user.username]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/submissions/:id/likes', async (req, res) => {
+  try {
+    await pool.query(
+      `DELETE FROM challenge_likes WHERE submission_id = $1 AND user_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('*', (req, res) => {
@@ -880,6 +1015,55 @@ async function start() {
     )
   `);
 
+  // Weekly Art Challenge: public tables (community content, like forum_threads/
+  // forum_replies above) — no admin role exists anywhere in this app, so the
+  // active theme rotates deterministically from the calendar date instead of
+  // being created through a UI (see getOrCreateCurrentChallenge()).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS challenge_prompts (
+      id SERIAL PRIMARY KEY,
+      theme VARCHAR(255) NOT NULL,
+      sort_order INTEGER NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS weekly_challenges (
+      id SERIAL PRIMARY KEY,
+      year_week VARCHAR(10) NOT NULL UNIQUE,
+      prompt_id INTEGER REFERENCES challenge_prompts(id),
+      theme VARCHAR(255) NOT NULL,
+      week_start DATE,
+      week_end DATE,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS challenge_submissions (
+      id SERIAL PRIMARY KEY,
+      challenge_id INTEGER NOT NULL REFERENCES weekly_challenges(id),
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      image_url TEXT NOT NULL,
+      caption VARCHAR(280),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (challenge_id, user_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS challenge_likes (
+      id SERIAL PRIMARY KEY,
+      submission_id INTEGER NOT NULL REFERENCES challenge_submissions(id),
+      user_id INTEGER NOT NULL,
+      username VARCHAR(255) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE (submission_id, user_id)
+    )
+  `);
+
   // ── Governance proposals seed ───────────────────────────────────────────────
   // Internally votes use direction 'for'/'against' (Yes=for, No=against) — only
   // the labels change in the UI — so the existing vote endpoint and on-chain
@@ -1018,6 +1202,34 @@ async function start() {
   await pool.query(`SELECT setval(pg_get_serial_sequence('forum_threads', 'id'), GREATEST((SELECT MAX(id) FROM forum_threads), 1))`);
   await pool.query(`SELECT setval(pg_get_serial_sequence('forum_replies', 'id'), GREATEST((SELECT MAX(id) FROM forum_replies), 1))`);
 
+  // ── Weekly Art Challenge prompt pool seed ───────────────────────────────────
+  // Seeded in all environments (product content, like the forum seed above).
+  // The active week's theme is picked from this pool by getOrCreateCurrentChallenge()
+  // using a deterministic index derived from the ISO week number, so the
+  // rotation needs no admin UI and behaves identically in staging/production.
+  const seededPrompts = [
+    [1, 'Autumn light', 1],
+    [2, 'One color, many moods', 2],
+    [3, 'A quiet corner', 3],
+    [4, 'Movement and blur', 4],
+    [5, 'Texture study', 5],
+    [6, 'Night', 6],
+    [7, 'Reflections', 7],
+    [8, 'The unfinished', 8],
+    [9, 'Scale — very small or very large', 9],
+    [10, 'Contrast', 10],
+    [11, "A place you've never been", 11],
+    [12, 'Portraits of things, not people', 12],
+  ];
+  for (const [id, theme, sortOrder] of seededPrompts) {
+    await pool.query(`
+      INSERT INTO challenge_prompts (id, theme, sort_order)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (id) DO NOTHING
+    `, [id, theme, sortOrder]);
+  }
+  await pool.query(`SELECT setval(pg_get_serial_sequence('challenge_prompts', 'id'), GREATEST((SELECT MAX(id) FROM challenge_prompts), 1))`);
+
   if (IS_STAGING) {
     // Seed mock votes so each proposal shows a distinct live Yes/No tally in
     // staging. (votes is staging:private — no rows copy from prod.) direction
@@ -1121,6 +1333,43 @@ async function start() {
     }
     await pool.query(`SELECT setval(pg_get_serial_sequence('dm_conversations', 'id'), GREATEST((SELECT MAX(id) FROM dm_conversations), 1))`);
     await pool.query(`SELECT setval(pg_get_serial_sequence('direct_messages', 'id'), GREATEST((SELECT MAX(id) FROM direct_messages), 1))`);
+
+    // Seed this week's challenge submissions + likes so the gallery renders
+    // populated. challenge_submissions uses ON CONFLICT ... DO UPDATE (not DO
+    // NOTHING) so that when the ISO week rolls over across staging rebuilds,
+    // these fixed-id demo rows get re-attached to the new current week's
+    // challenge_id instead of pointing at a past week.
+    const currentChallenge = await getOrCreateCurrentChallenge();
+    const mockSubmissions = [
+      [900001, currentChallenge.id, 9001, 'staging-artist-1', 'https://placehold.co/600x400/png?text=Staging+demo+1', 'Staging demo — chasing the last of the golden hour'],
+      [900002, currentChallenge.id, 9002, 'staging-artist-2', 'https://placehold.co/600x400/png?text=Staging+demo+2', 'Staging demo — moody blues for the theme'],
+      [900003, currentChallenge.id, 9003, 'staging-artist-3', 'https://placehold.co/600x400/png?text=Staging+demo+3', 'Staging demo — first attempt, feedback welcome'],
+      [900004, currentChallenge.id, 9004, 'staging-artist-4', 'https://placehold.co/600x400/png?text=Staging+demo+4', 'Staging demo — a quick sketch tonight'],
+    ];
+    for (const [id, challengeId, uid, uname, imageUrl, caption] of mockSubmissions) {
+      await pool.query(`
+        INSERT INTO challenge_submissions (id, challenge_id, user_id, username, image_url, caption)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (id) DO UPDATE SET challenge_id = EXCLUDED.challenge_id
+      `, [id, challengeId, uid, uname, imageUrl, caption]);
+    }
+    const mockLikes = [
+      [900001, 900001, 9002, 'staging-artist-2'],
+      [900002, 900001, 9003, 'staging-artist-3'],
+      [900003, 900001, 9004, 'staging-artist-4'],
+      [900004, 900002, 9001, 'staging-artist-1'],
+      [900005, 900003, 9001, 'staging-artist-1'],
+      [900006, 900003, 9002, 'staging-artist-2'],
+    ];
+    for (const [id, submissionId, uid, uname] of mockLikes) {
+      await pool.query(`
+        INSERT INTO challenge_likes (id, submission_id, user_id, username)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id) DO NOTHING
+      `, [id, submissionId, uid, uname]);
+    }
+    await pool.query(`SELECT setval(pg_get_serial_sequence('challenge_submissions', 'id'), GREATEST((SELECT MAX(id) FROM challenge_submissions), 1))`);
+    await pool.query(`SELECT setval(pg_get_serial_sequence('challenge_likes', 'id'), GREATEST((SELECT MAX(id) FROM challenge_likes), 1))`);
 
     // Resolve every proposal's outcome from the seeded votes so the demo
     // (/?demo=1) shows a mix of badges: Fee Split (#1) and dividend (#4) Passed
