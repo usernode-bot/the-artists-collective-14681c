@@ -27,12 +27,27 @@ const CHAIN_ID = (process.env.CHAIN_ID || process.env.USERNODE_CHAIN_ID || '').t
 const PUBLIC_API_PATHS = new Set(['/health']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
+// Fixed, obviously-fake identity used for staging demo/preview reads (see the
+// middleware below). Never referenced in production.
+const DEMO_USER = { id: 900000, username: 'staging-demo-user', usernode_pubkey: null };
+
 app.use(express.json());
 
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
   if (token && JWT_SECRET) {
     try { req.user = jwt.verify(token, JWT_SECRET); } catch {}
+  }
+  // Staging-only demo affordance. The /?demo=1 (and /?demo=welcome) preview —
+  // used by the before/after screenshots and the automated proposal checks —
+  // has no platform token, so its read-only GET /api/* fetches would otherwise
+  // 401 and the seeded dashboard would never render (each 401 also trips the
+  // "no console errors" check). When there is no real user, run those GET reads
+  // under a fixed demo identity so the seeded rows load. Strictly gated on
+  // IS_STAGING + GET, so production auth and every write path are unchanged:
+  // flipping to production makes this a no-op, not a feature/logic change.
+  if (!req.user && IS_STAGING && req.method === 'GET' && req.query.demo) {
+    req.user = DEMO_USER;
   }
   if (req.method !== 'GET' || req.path.startsWith('/api/')) {
     if (PUBLIC_API_PATHS.has(req.path)) return next();
