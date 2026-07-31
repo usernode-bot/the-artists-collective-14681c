@@ -24,10 +24,14 @@ const EXPLORER_BASE = (
 ).replace(/\/+$/, '');
 const CHAIN_ID = (process.env.CHAIN_ID || process.env.USERNODE_CHAIN_ID || '').trim();
 
-const PUBLIC_API_PATHS = new Set(['/health']);
+const PUBLIC_API_PATHS = new Set(['/health', '/favicon.ico']);
 const PUBLIC_PREFIXES = ['/explorer-api/'];
 
 app.use(express.json());
+
+// Browsers request /favicon.ico on every page load; answer before the auth
+// gate / catch-all so it never logs a console error.
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 
 app.use((req, res, next) => {
   const token = req.query.token || req.headers['x-usernode-token'];
