@@ -74,7 +74,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <script src="https://social-vibecoding.usernodelabs.org/usernode-bridge/v1/bridge.js"></script>
+  <script src="/usernode-bridge/v1/bridge.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1801,7 +1801,7 @@
 
     <!-- Center: Menu -->
     <div class="mob-nav-item">
-      <a class="mob-nav-menu-btn" href="https://social-vibecoding.usernodelabs.org/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
+      <a class="mob-nav-menu-btn" href="#" data-platform-path="/#app/the-artists-collective-14681c/" target="_blank" rel="noopener" aria-label="Menu — return to app home">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M1.5 6.2L7 1.5L12.5 6.2V12.5H9V9H5V12.5H1.5V6.2Z" stroke="#7c5cbf" stroke-width="1.5" stroke-linejoin="round" fill="none"/>
         </svg>
@@ -3648,6 +3648,20 @@
   }
 
 })();
+</script>
+<script>
+  // The menu link's platform address comes from the browser, not a hostname
+  // written into this page (#2047): inside the platform the app is framed, so
+  // the top frame's origin is the platform (ancestorOrigins, else the referrer).
+  (function () {
+    var origin = '';
+    try { var a = window.location.ancestorOrigins; if (a && a.length) origin = a[a.length - 1]; } catch (_) {}
+    if (!origin) { try { if (document.referrer) origin = new URL(document.referrer).origin; } catch (_) {} }
+    if (!origin) return;
+    document.querySelectorAll('a[data-platform-path]').forEach(function (el) {
+      el.href = origin + el.getAttribute('data-platform-path');
+    });
+  })();
 </script>
 </body>
 </html>
