@@ -3627,11 +3627,21 @@
   // Demo/staging affordance: ?demo=1 auto-enters the studio so before/after
   // screenshots and proposal checks land on a populated dashboard (which
   // renders from the seeded DB) instead of the gate. No-op without the flag.
+  // With a token the auto-entry check above disables the button ("Checking…")
+  // until /api/enrolments/me answers, and a click on a disabled button is
+  // dropped — so wait for it to settle, and skip the click if auto-entry
+  // already left the gate.
   if (params.get('demo') === '1') {
-    setTimeout(function () {
+    (function tryEnter(attempt) {
       var enterBtn = document.getElementById('enter-btn');
-      if (enterBtn) enterBtn.click();
-    }, 0);
+      var gate = document.getElementById('view-gate');
+      if (!enterBtn || (gate && gate.classList.contains('hidden'))) return;
+      if (enterBtn.disabled) {
+        if (attempt < 100) setTimeout(function () { tryEnter(attempt + 1); }, 100);
+        return;
+      }
+      enterBtn.click();
+    })(0);
   }
 
   // ?demo=welcome shows the one-time welcome panel with a hardcoded TACT value
