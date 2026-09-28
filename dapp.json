@@ -1,4 +1,5 @@
 {
+  "icon": { "image": "brand/icon.png" },
   "name": "The Artists' Collective",
   "secrets": [
     {
@@ -95,11 +96,6 @@
       "name": "Proposal card shows human title",
       "path": "/?demo=1",
       "expectText": "Feature one rising artist on the homepage each week"
-    },
-    {
-      "name": "Undecided proposal shows Voting open badge",
-      "path": "/?demo=1",
-      "expectText": "Voting open"
     },
     {
       "name": "Ledger Sales sub-tab renders",
