@@ -1846,6 +1846,11 @@
   var params = new URLSearchParams(window.location.search);
   var TOKEN = params.get('token') || '';
   var HEADERS = TOKEN ? { 'x-usernode-token': TOKEN } : {};
+  // Active demo/preview flag ('1' or 'welcome'). When set (and there is no
+  // platform token), api() forwards it on every request so the staging server
+  // can serve the seeded dashboard under its demo identity. No-op in production
+  // (the server only honours it when USERNODE_ENV=staging).
+  var DEMO = params.get('demo') || '';
   // userAddr is the real wallet address from the platform bridge
   // (window.getNodeAddress), or '' when there is genuinely no wallet. We never
   // cache an isNative flag or fabricate an address — wallet calls go straight to
@@ -1925,7 +1930,14 @@
   // ── API helpers ────────────────────────────────────────────────────────────
   function api(path, opts) {
     opts = opts || {};
-    return fetch(path, Object.assign({}, opts, {
+    var url = path;
+    // Carry the demo flag through to the API so staging can authorize the
+    // seeded preview reads. Only when there's no real token — a logged-in
+    // session never needs it.
+    if (DEMO && !TOKEN) {
+      url += (url.indexOf('?') === -1 ? '?' : '&') + 'demo=' + encodeURIComponent(DEMO);
+    }
+    return fetch(url, Object.assign({}, opts, {
       headers: Object.assign({ 'Content-Type': 'application/json' }, HEADERS, opts.headers || {}),
     })).then(function (res) {
       if (!res.ok) throw new Error(path + ' → ' + res.status);
